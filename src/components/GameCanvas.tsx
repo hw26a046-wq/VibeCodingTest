@@ -490,9 +490,6 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       } else {
         state.passives.push({ type: target, level: 1 });
       }
-
-      // Re-apply passives modifications to player.stats dynamically
-      applyPassivesToPlayerStats();
     }
 
     // Sync state back to react arrays for rendering in HUD
@@ -508,6 +505,9 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     // Escalate next level requirements like Vampire Survivors
     state.stats.nextLevelExp = Math.round(5 + state.stats.level * 4.5);
 
+    // Re-apply passives & level-up stats modifications to player.stats dynamically 
+    applyPassivesToPlayerStats();
+
     // If leftover exp is still enough for another level up, restart level trigger
     if (state.stats.exp >= state.stats.nextLevelExp) {
       setTimeout(() => {
@@ -520,6 +520,10 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     const state = stateRef.current;
     // Reset player stats back to base class stats
     const stats = { ...playerClass.baseStats };
+
+    // Apply level-up Might bonus: +6% (0.06) attack power per level gained
+    const levelBonusMight = (state.stats.level - 1) * 0.06;
+    stats.might += levelBonusMight;
 
     state.passives.forEach((p) => {
       if (p.type === 'might') {
