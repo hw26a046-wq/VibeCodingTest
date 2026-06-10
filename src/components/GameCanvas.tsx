@@ -56,6 +56,8 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
 
   // References used to keep game state separate from React and avoid context render bottlenecks
   const stateRef = React.useRef({
+    showLevelUp: false,
+    isPaused: false,
     player: {
       x: 0,
       y: 0,
@@ -198,7 +200,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
 
   // Mouse / Touch Virtual Joystick Actions
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (showLevelUp || isPaused) return;
+    if (stateRef.current.showLevelUp || stateRef.current.isPaused) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const clientX = e.clientX - rect.left;
@@ -217,7 +219,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const joy = stateRef.current.virtualJoystick;
-    if (!joy.active || showLevelUp || isPaused) return;
+    if (!joy.active || stateRef.current.showLevelUp || stateRef.current.isPaused) return;
 
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -389,6 +391,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     const finalOptions = shuffled.slice(0, 3);
 
     setLevelUpOptions(finalOptions);
+    stateRef.current.showLevelUp = true;
     setShowLevelUp(true);
   };
 
@@ -497,6 +500,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     setPassivesList([...state.passives]);
 
     // Update screen
+    stateRef.current.showLevelUp = false;
     setShowLevelUp(false);
 
     // Subtract level thresholds
@@ -521,8 +525,8 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     // Reset player stats back to base class stats
     const stats = { ...playerClass.baseStats };
 
-    // Apply level-up Might bonus: +6% (0.06) attack power per level gained
-    const levelBonusMight = (state.stats.level - 1) * 0.06;
+    // Apply level-up Might bonus: +20% (0.20) attack power per level gained
+    const levelBonusMight = (state.stats.level - 1) * 0.20;
     stats.might += levelBonusMight;
 
     state.passives.forEach((p) => {
@@ -602,7 +606,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
           const repeats = w.level >= 4 ? 3 : (w.level >= 2 ? 2 : 1);
           for (let r = 0; r < repeats; r++) {
             setTimeout(() => {
-              if (showLevelUp || isPaused) return;
+              if (stateRef.current.showLevelUp || stateRef.current.isPaused) return;
               state.projectiles.push({
                 id: Math.random().toString(),
                 type: 'whip',
@@ -809,7 +813,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
 
   // Central Game update, physics, collision and rendering frame
   const updateAndRender = () => {
-    if (showLevelUp || isPaused || stateRef.current.isGameOverCalled) return;
+    if (stateRef.current.showLevelUp || stateRef.current.isPaused || stateRef.current.isGameOverCalled) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -2044,9 +2048,9 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       }
     }
 
-    // Spawn additional enemies every 6 seconds, scaling with player level
+    // Spawn additional enemies every 6 seconds, scaling with player level (leveling up twice adds +2 enemies)
     if (elapsedSeconds > 0 && elapsedSeconds % 6 === 0) {
-      const spawnCount = 5 + (state.stats.level - 1) * 2;
+      const spawnCount = 5 + Math.floor((state.stats.level - 1) / 2) * 2;
       for (let i = 0; i < spawnCount; i++) {
         const angle = Math.random() * Math.PI * 2;
         const outerRange = 400 + Math.random() * 100;
@@ -2239,7 +2243,9 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
 
   const handleManualPause = () => {
     sfx.playSelect();
-    setIsPaused(!isPaused);
+    const nextPaused = !stateRef.current.isPaused;
+    stateRef.current.isPaused = nextPaused;
+    setIsPaused(nextPaused);
   };
 
   const formatTimerVal = (seconds: number): string => {
