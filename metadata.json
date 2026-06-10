@@ -1,0 +1,6 @@
+{
+  "name": "ヴァンパイア・サバイバー：アビス",
+  "description": "ヴァンパイアサバイバー風の2Dローグライク・アクションゲーム。多彩な武器、固有アビリティを持つクラス、ランダムなパワーアップ装備を駆使して、無限に迫る魔物の群れから生き延びろ！",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
