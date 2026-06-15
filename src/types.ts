@@ -24,6 +24,7 @@ export interface PlayerClass {
   subtitle: string;
   description: string;
   emoji: string;
+  image?: string;
   baseStats: CharacterStats;
   startingWeapon: WeaponType;
   color: string;

@@ -58,6 +58,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
   const stateRef = React.useRef({
     showLevelUp: false,
     isPaused: false,
+    playerImgElement: null as HTMLImageElement | HTMLCanvasElement | null,
     player: {
       x: 0,
       y: 0,
@@ -122,6 +123,47 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
   React.useEffect(() => {
     // Start background track
     sfx.startBgm();
+
+    // Load custom player class image if any
+    if (playerClass.image) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        // Create offscreen canvas to remove white background from the pixel art
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          try {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            // Go through all pixels and make background (near white) transparent
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              // If the pixel is very close to white, make it transparent
+              if (r > 240 && g > 240 && b > 240) {
+                data[i + 3] = 0; // Alpha = 0
+              }
+            }
+            ctx.putImageData(imageData, 0, 0);
+            stateRef.current.playerImgElement = canvas;
+          } catch (e) {
+            console.error('Error transparentizing image:', e);
+            stateRef.current.playerImgElement = img;
+          }
+        } else {
+          stateRef.current.playerImgElement = img;
+        }
+      };
+      img.src = playerClass.image;
+      stateRef.current.playerImgElement = img; // Fallback while loading
+    } else {
+      stateRef.current.playerImgElement = null;
+    }
 
     // Set Initial Weapons
     const initialWeaponState: WeaponState = {
@@ -1866,20 +1908,32 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     ctx.arc(px, py, state.player.stats.magnetRange, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Body
-    ctx.fillStyle = playerClass.color;
-    ctx.beginPath();
-    ctx.arc(px, py, state.player.radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Drawing the class emoji over center
-    ctx.font = '22px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
     // Add heavy walking animation bobble
     const bobY = Math.abs(Math.sin(state.player.animationFrame)) * -4;
-    ctx.fillText(playerClass.emoji, px, py + bobY - 2);
+
+    const img = state.playerImgElement;
+    const isReady = img && (
+      (img instanceof HTMLImageElement && img.complete && img.naturalWidth !== 0) ||
+      (img instanceof HTMLCanvasElement && img.width > 0)
+    );
+    if (isReady && img) {
+      // Draw custom pixel art image centered over (px, py + bobY) with further increased width
+      const imgHeight = state.player.radius * 4.5;
+      const imgWidth = state.player.radius * 8.5; // Significantly wider horizontally
+      ctx.drawImage(img, px - imgWidth / 2, py + bobY - imgHeight / 2, imgWidth, imgHeight);
+    } else {
+      // Body fallback
+      ctx.fillStyle = playerClass.color;
+      ctx.beginPath();
+      ctx.arc(px, py, state.player.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Drawing the class emoji over center
+      ctx.font = '22px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(playerClass.emoji, px, py + bobY - 2);
+    }
 
     ctx.restore();
 

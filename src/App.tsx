@@ -248,8 +248,17 @@ export default function App() {
               <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 flex flex-col gap-3 font-mono justify-center items-stretch text-sm text-left mb-8">
                 <div className="flex justify-between items-center text-xs pb-2 border-b border-zinc-800/40">
                   <span className="text-zinc-500 tracking-wider">使用クラス</span>
-                  <span style={{ color: selectedClass.color }} className="font-extrabold flex items-center gap-1">
-                    <span>{selectedClass.emoji}</span>
+                  <span style={{ color: selectedClass.color }} className="font-extrabold flex items-center gap-1.5">
+                    {selectedClass.image ? (
+                      <img
+                        src={selectedClass.image}
+                        alt={selectedClass.name}
+                        className="w-5 h-5 rounded-full object-cover border border-zinc-800 shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span>{selectedClass.emoji}</span>
+                    )}
                     <span>{selectedClass.name}</span>
                   </span>
                 </div>

@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import { PlayerClass, WeaponType } from '../types';
 import { sfx } from '../utils/audio';
 import { Shield, Sparkles, Zap, Crosshair, Heart, Swords, Eye, Clock } from 'lucide-react';
+import mageLyraImg from '../assets/images/mage_lyra_1781490902001.jpg';
 
 export const CLASSES: PlayerClass[] = [
   {
@@ -35,6 +36,7 @@ export const CLASSES: PlayerClass[] = [
     subtitle: 'Mage Lyra',
     description: '神秘の魔力と元素を操る学者。初期状態から攻撃冷却速度(クールダウン)が15%短縮されており、攻撃サイズも全クラス中最大です。身は脆い。',
     emoji: '🔮',
+    image: mageLyraImg,
     color: '#a855f7', // Vivid Purple
     startingWeapon: 'fireball',
     baseStats: {
@@ -169,8 +171,17 @@ export function ClassSelect({ onSelect }: ClassSelectProps) {
                   )}
 
                   <div className="flex items-start gap-3 md:gap-4 relative z-10">
-                    <span className="text-3xl md:text-4xl bg-zinc-800/80 p-2 md:p-3 rounded-xl block outline-none ring-0">
-                      {cls.emoji}
+                    <span className="text-3xl md:text-4xl bg-zinc-800/80 p-2 md:p-3 rounded-xl block outline-none ring-0 overflow-hidden flex items-center justify-center w-12 h-12 md:w-16 md:h-16 shrink-0">
+                      {cls.image ? (
+                        <img
+                          src={cls.image}
+                          alt={cls.name}
+                          className="w-full h-full object-cover rounded-lg"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        cls.emoji
+                      )}
                     </span>
                     <div className="min-w-0 transition-transform duration-300">
                       <h3
@@ -214,8 +225,17 @@ export function ClassSelect({ onSelect }: ClassSelectProps) {
 
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <span className="text-4xl p-1 bg-zinc-900 border border-zinc-800 rounded-2xl">
-                  {selectedClass.emoji}
+                <span className="text-4xl p-1 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex items-center justify-center w-20 h-20 shrink-0">
+                  {selectedClass.image ? (
+                    <img
+                      src={selectedClass.image}
+                      alt={selectedClass.name}
+                      className="w-full h-full object-cover rounded-xl"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    selectedClass.emoji
+                  )}
                 </span>
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold text-zinc-100 flex items-center gap-2">
