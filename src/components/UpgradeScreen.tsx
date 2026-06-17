@@ -128,7 +128,7 @@ export function UpgradeScreen({ options, onSelect }: UpgradeScreenProps) {
           ) : (
             options.map((opt, index) => {
               const isNewWeapon = opt.type === 'weapon' && opt.level === 1;
-              const isMaxLevel = opt.level === 5;
+              const isMaxLevel = (opt.type === 'weapon' && opt.level === 10) || (opt.type === 'passive' && opt.level === 8);
               const theme = getColorTheme(opt.targetType);
 
               return (

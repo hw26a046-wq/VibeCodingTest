@@ -209,7 +209,13 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="w-full h-[620px] max-w-6xl mx-auto bg-zinc-950 rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl relative"
             >
-              <GameCanvas playerClass={selectedClass} onGameOver={handleGameOverStats} />
+              <GameCanvas
+                playerClass={selectedClass}
+                onGameOver={handleGameOverStats}
+                onBackToTitle={() => {
+                  setScreen('title');
+                }}
+              />
             </motion.div>
           )}
 

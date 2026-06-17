@@ -8,7 +8,10 @@ import { motion } from 'motion/react';
 import { PlayerClass, WeaponType } from '../types';
 import { sfx } from '../utils/audio';
 import { Shield, Sparkles, Zap, Crosshair, Heart, Swords, Eye, Clock } from 'lucide-react';
-import mageLyraImg from '../assets/images/mage_lyra_1781490902001.jpg';
+import knightAlistairImg from '../assets/images/knight_alistair_1781674975459.jpg';
+import mageLyraBlueImg from '../assets/images/mage_lyra_blue_1781674990330.jpg';
+import assassinKaelenImg from '../assets/images/assassin_kaelen_1781675004366.jpg';
+import hunterMarcusImg from '../assets/images/hunter_marcus_1781675017229.jpg';
 
 export const CLASSES: PlayerClass[] = [
   {
@@ -17,6 +20,7 @@ export const CLASSES: PlayerClass[] = [
     subtitle: 'Knight Alistair',
     description: '聖なる盾と頑強な肉体を持つ守護者。最大HPが非常に高く、敵から受けるダメージを常に大幅カットするため初心者でも生存が容易です。',
     emoji: '🛡️',
+    image: knightAlistairImg,
     color: '#3b82f6', // Bright Azure
     startingWeapon: 'whip',
     baseStats: {
@@ -36,7 +40,7 @@ export const CLASSES: PlayerClass[] = [
     subtitle: 'Mage Lyra',
     description: '神秘の魔力と元素を操る学者。初期状態から攻撃冷却速度(クールダウン)が15%短縮されており、攻撃サイズも全クラス中最大です。身は脆い。',
     emoji: '🔮',
-    image: mageLyraImg,
+    image: mageLyraBlueImg,
     color: '#a855f7', // Vivid Purple
     startingWeapon: 'fireball',
     baseStats: {
@@ -56,6 +60,7 @@ export const CLASSES: PlayerClass[] = [
     subtitle: 'Assassin Kaelen',
     description: '暗闇に紛れ急所を穿つ影の戦士。最高水準の移動スピードと、異常に広い磁気探知（アイテム自動回収）能力を持ち、流れるように戦闘できます。',
     emoji: '🥷',
+    image: assassinKaelenImg,
     color: '#10b981', // Emerald Green
     startingWeapon: 'garlic',
     baseStats: {
@@ -75,6 +80,7 @@ export const CLASSES: PlayerClass[] = [
     subtitle: 'Hunter Marcus',
     description: '古来より闇の種族を追う魔物殺し。基礎火力が全クラス中トップの130%であり、敵をなぎ倒す高威力の斧で地平線を切り開きます。',
     emoji: '🧛',
+    image: hunterMarcusImg,
     color: '#ef4444', // Crimson Row
     startingWeapon: 'axe',
     baseStats: {

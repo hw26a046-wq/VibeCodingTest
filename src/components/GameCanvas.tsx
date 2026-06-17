@@ -20,15 +20,29 @@ import {
   GameStats,
 } from '../types';
 import { UpgradeScreen } from './UpgradeScreen';
+import { ChestScreen } from './ChestScreen';
 import { sfx } from '../utils/audio';
 import { Skull, Heart, Timer, Zap, Shield, Volume2, VolumeX, Pause, Play, Coins, Award, Swords, Clock } from 'lucide-react';
+
+// New enemy pixel art images
+import zombieImage from '../assets/images/zombie_pixel_1781679591842.jpg';
+import skeletonImage from '../assets/images/skeleton_pixel_1781679606311.jpg';
+import ghostImage from '../assets/images/ghost_pixel_1781679622600.jpg';
+import wolfImage from '../assets/images/wolf_pixel_1781679635356.jpg';
+import batImage from '../assets/images/bat_pixel_1781682195973.jpg';
+import medusaImage from '../assets/images/medusa_pixel_1781682795082.jpg';
+import golemImage from '../assets/images/golem_pixel_1781682811481.jpg';
+import archmageImage from '../assets/images/archmage_pixel_1781682828347.jpg';
+import dragonImage from '../assets/images/dragon_pixel_1781682915205.jpg';
+import phoenixImage from '../assets/images/phoenix_pixel_1781682935560.jpg';
 
 interface GameCanvasProps {
   playerClass: PlayerClass;
   onGameOver: (stats: GameStats) => void;
+  onBackToTitle: () => void;
 }
 
-export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
+export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanvasProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
 
@@ -39,6 +53,11 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
   const [isPaused, setIsPaused] = React.useState<boolean>(false);
   const [showLevelUp, setShowLevelUp] = React.useState<boolean>(false);
   const [levelUpOptions, setLevelUpOptions] = React.useState<ActiveUpgrade[]>([]);
+
+  // Chest States
+  const [showChest, setShowChest] = React.useState<boolean>(false);
+  const [chestAwards, setChestAwards] = React.useState<ActiveUpgrade[]>([]);
+  const [chestUpgradeCount, setChestUpgradeCount] = React.useState<number>(1);
 
   // Statistics State for HUD
   const [hudStats, setHudStats] = React.useState<GameStats>({
@@ -57,8 +76,10 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
   // References used to keep game state separate from React and avoid context render bottlenecks
   const stateRef = React.useRef({
     showLevelUp: false,
+    showChest: false,
     isPaused: false,
     playerImgElement: null as HTMLImageElement | HTMLCanvasElement | null,
+    enemyImages: {} as Record<string, HTMLImageElement | HTMLCanvasElement | null>,
     player: {
       x: 0,
       y: 0,
@@ -124,46 +145,260 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     // Start background track
     sfx.startBgm();
 
-    // Load custom player class image if any
-    if (playerClass.image) {
-      const img = new Image();
+    // Helper to remove white/black background from pixel art using BFS flood-fill
+    const removeBackground = (img: HTMLImageElement, callback: (canvas: HTMLCanvasElement) => void) => {
       img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        // Create offscreen canvas to remove white background from the pixel art
+      const handleLoad = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
+        canvas.width = img.naturalWidth || img.width || 128;
+        canvas.height = img.naturalHeight || img.height || 128;
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0);
           try {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const width = canvas.width;
+            const height = canvas.height;
+            const imageData = ctx.getImageData(0, 0, width, height);
             const data = imageData.data;
-            // Go through all pixels and make background (near white) transparent
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-              // If the pixel is very close to white, make it transparent
-              if (r > 240 && g > 240 && b > 240) {
-                data[i + 3] = 0; // Alpha = 0
+            
+            const visited = new Uint8Array(width * height);
+            const queue = new Int32Array(width * height);
+            let qHead = 0;
+            let qTail = 0;
+            
+            // First, scan all outer border pixels to detect the dominant background color profile (White vs Black)
+            let whiteCount = 0;
+            let blackCount = 0;
+            
+            const borderIndices: number[] = [];
+            for (let x = 0; x < width; x++) {
+              borderIndices.push(0 * width + x); // top line
+              borderIndices.push((height - 1) * width + x); // bottom line
+            }
+            for (let y = 1; y < height - 1; y++) {
+              borderIndices.push(y * width + 0); // left column
+              borderIndices.push(y * width + (width - 1)); // right column
+            }
+            
+            for (const vIdx of borderIndices) {
+              const idx = vIdx * 4;
+              const r = data[idx];
+              const g = data[idx + 1];
+              const b = data[idx + 2];
+              
+              if (r > 150 && g > 150 && b > 150) {
+                whiteCount++;
+              } else if (r < 100 && g < 100 && b < 100) {
+                blackCount++;
               }
             }
+            
+            const isWhiteBgMode = whiteCount > blackCount;
+            
+            // Seed all border pixels matching the dominant background profile
+            for (const vIdx of borderIndices) {
+              const idx = vIdx * 4;
+              const r = data[idx];
+              const g = data[idx + 1];
+              const b = data[idx + 2];
+              
+              const max = Math.max(r, g, b);
+              const min = Math.min(r, g, b);
+              const isNeutral = (max - min) < 30;
+              
+              let isMatch = false;
+              if (isWhiteBgMode) {
+                isMatch = (r > 130 && g > 130 && b > 130) || (max > 100 && isNeutral);
+              } else {
+                isMatch = (r < 110 && g < 110 && b < 110) || (max < 120 && isNeutral);
+              }
+              
+              if (isMatch && visited[vIdx] === 0) {
+                queue[qTail++] = vIdx;
+                visited[vIdx] = 1;
+                data[idx + 3] = 0; // Transparent
+              }
+            }
+            
+            // BFS Outer-background Flood Fill
+            while (qHead < qTail) {
+              const currIdx = queue[qHead++];
+              const x = currIdx % width;
+              const y = Math.floor(currIdx / width);
+              
+              const neighbors = [
+                [x - 1, y],
+                [x + 1, y],
+                [x, y - 1],
+                [x, y + 1]
+              ];
+              
+              for (const [nx, ny] of neighbors) {
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                  const nIdx = ny * width + nx;
+                  if (visited[nIdx] === 0) {
+                    const dIdx = nIdx * 4;
+                    const r = data[dIdx];
+                    const g = data[dIdx + 1];
+                    const b = data[dIdx + 2];
+                    
+                    const max = Math.max(r, g, b);
+                    const min = Math.min(r, g, b);
+                    const isNeutral = (max - min) < 35;
+                    
+                    let isBackground = false;
+                    if (isWhiteBgMode) {
+                      isBackground = (r > 140 && g > 140 && b > 140) || (max > 120 && isNeutral);
+                    } else {
+                      isBackground = (r < 95 && g < 95 && b < 95) || (max < 105 && isNeutral);
+                    }
+                    
+                    if (isBackground) {
+                      queue[qTail++] = nIdx;
+                      visited[nIdx] = 1;
+                      data[dIdx + 3] = 0; // Transparent
+                    }
+                  }
+                }
+              }
+            }
+            
+            // Halo Clean-up Sweep: Check non-transparent pixels bordering transparent ones
+            // and eliminate compression artifacts/halos around edges
+            for (let y = 1; y < height - 1; y++) {
+              for (let x = 1; x < width - 1; x++) {
+                const vIdx = y * width + x;
+                const dIdx = vIdx * 4;
+                
+                if (data[dIdx + 3] > 0) {
+                  const hasTransparentNeighbor = 
+                    data[((y - 1) * width + x) * 4 + 3] === 0 ||
+                    data[((y + 1) * width + x) * 4 + 3] === 0 ||
+                    data[(y * width + (x - 1)) * 4 + 3] === 0 ||
+                    data[(y * width + (x + 1)) * 4 + 3] === 0;
+                    
+                  if (hasTransparentNeighbor) {
+                    const r = data[dIdx];
+                    const g = data[dIdx + 1];
+                    const b = data[dIdx + 2];
+                    const max = Math.max(r, g, b);
+                    const min = Math.min(r, g, b);
+                    const isNeutral = (max - min) < 45;
+                    
+                    let matchStrength = 0;
+                    if (isWhiteBgMode) {
+                      if (max > 120 && isNeutral) {
+                        matchStrength = (max - 120) / 135;
+                      } else if (r > 130 && g > 130 && b > 130) {
+                        matchStrength = (Math.min(r, g, b) - 130) / 125;
+                      }
+                    } else {
+                      if (max < 110 && isNeutral) {
+                        matchStrength = (110 - max) / 110;
+                      } else if (r < 100 && g < 100 && b < 100) {
+                        matchStrength = (100 - Math.max(r, g, b)) / 100;
+                      }
+                    }
+                    
+                    if (matchStrength > 0.1) {
+                      if (matchStrength > 0.3) {
+                        data[dIdx + 3] = 0; // fully remove border halo
+                      } else {
+                        data[dIdx + 3] = Math.round(data[dIdx + 3] * (1 - matchStrength));
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            
             ctx.putImageData(imageData, 0, 0);
-            stateRef.current.playerImgElement = canvas;
+            callback(canvas);
           } catch (e) {
-            console.error('Error transparentizing image:', e);
-            stateRef.current.playerImgElement = img;
+            console.error('Error transparentizing image background:', e);
+            callback(canvas);
           }
-        } else {
-          stateRef.current.playerImgElement = img;
         }
       };
+      if (img.complete) {
+        handleLoad();
+      } else {
+        img.onload = handleLoad;
+      }
+    };
+
+    // Load custom player class image if any
+    if (playerClass.image) {
+      const img = new Image();
       img.src = playerClass.image;
-      stateRef.current.playerImgElement = img; // Fallback while loading
+      removeBackground(img, (canvas) => {
+        stateRef.current.playerImgElement = canvas;
+      });
+      stateRef.current.playerImgElement = img; // Fallback
     } else {
       stateRef.current.playerImgElement = null;
     }
+
+    // Load custom enemy images and apply flood-fill background transparency
+    const zombieImg = new Image();
+    zombieImg.src = zombieImage;
+    removeBackground(zombieImg, (canvas) => {
+      stateRef.current.enemyImages['zombie'] = canvas;
+    });
+
+    const skeletonImg = new Image();
+    skeletonImg.src = skeletonImage;
+    removeBackground(skeletonImg, (canvas) => {
+      stateRef.current.enemyImages['skeleton'] = canvas;
+    });
+
+    const ghostImg = new Image();
+    ghostImg.src = ghostImage;
+    removeBackground(ghostImg, (canvas) => {
+      stateRef.current.enemyImages['ghost'] = canvas;
+    });
+
+    const wolfImg = new Image();
+    wolfImg.src = wolfImage;
+    removeBackground(wolfImg, (canvas) => {
+      stateRef.current.enemyImages['werewolf'] = canvas;
+    });
+
+    const batImg = new Image();
+    batImg.src = batImage;
+    removeBackground(batImg, (canvas) => {
+      stateRef.current.enemyImages['bat'] = canvas;
+    });
+
+    const medusaImg = new Image();
+    medusaImg.src = medusaImage;
+    removeBackground(medusaImg, (canvas) => {
+      stateRef.current.enemyImages['medusa_boss'] = canvas;
+    });
+
+    const golemImg = new Image();
+    golemImg.src = golemImage;
+    removeBackground(golemImg, (canvas) => {
+      stateRef.current.enemyImages['golem_boss'] = canvas;
+    });
+
+    const archmageImg = new Image();
+    archmageImg.src = archmageImage;
+    removeBackground(archmageImg, (canvas) => {
+      stateRef.current.enemyImages['archmage_boss'] = canvas;
+    });
+
+    const dragonImg = new Image();
+    dragonImg.src = dragonImage;
+    removeBackground(dragonImg, (canvas) => {
+      stateRef.current.enemyImages['dragon_boss'] = canvas;
+    });
+
+    const phoenixImg = new Image();
+    phoenixImg.src = phoenixImage;
+    removeBackground(phoenixImg, (canvas) => {
+      stateRef.current.enemyImages['phoenix_boss'] = canvas;
+    });
 
     // Set Initial Weapons
     const initialWeaponState: WeaponState = {
@@ -242,7 +477,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
 
   // Mouse / Touch Virtual Joystick Actions
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (stateRef.current.showLevelUp || stateRef.current.isPaused) return;
+    if (stateRef.current.showLevelUp || stateRef.current.showChest || stateRef.current.isPaused) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const clientX = e.clientX - rect.left;
@@ -261,7 +496,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const joy = stateRef.current.virtualJoystick;
-    if (!joy.active || stateRef.current.showLevelUp || stateRef.current.isPaused) return;
+    if (!joy.active || stateRef.current.showLevelUp || stateRef.current.showChest || stateRef.current.isPaused) return;
 
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -354,12 +589,9 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     });
   };
 
-  // Formulate Upgrades on Level Up
-  const triggerLevelUpTransition = () => {
-    sfx.playLevelUp();
+  // Get all available upgrades currently eligible
+  const getAvailableUpgradesPool = (): ActiveUpgrade[] => {
     const state = stateRef.current;
-    
-    // Choose 3 random, non-max level upgrades
     const availablePool: ActiveUpgrade[] = [];
 
     // Check weapons list
@@ -373,7 +605,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     
     weaponTypesList.forEach((wType) => {
       const level = currentWeaponsMap.get(wType) || 0;
-      if (level > 0 && level < 5) {
+      if (level > 0 && level < 10) {
         // Upgrade existing
         availablePool.push({
           id: `w-${wType}-${level + 1}`,
@@ -405,7 +637,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
     const passiveTypesList: PassiveType[] = ['might', 'armor', 'speed', 'magnet', 'maxHp', 'cooldown'];
     passiveTypesList.forEach((pType) => {
       const level = currentPassivesMap.get(pType) || 0;
-      if (level > 0 && level < 5) {
+      if (level > 0 && level < 8) {
         availablePool.push({
           id: `p-${pType}-${level + 1}`,
           name: getUpgradeName(pType),
@@ -428,13 +660,103 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       }
     });
 
+    return availablePool;
+  };
+
+  // Formulate Upgrades on Level Up
+  const triggerLevelUpTransition = () => {
+    sfx.playLevelUp();
+    const availablePool = getAvailableUpgradesPool();
+
     // Shuffle pool and select 3
-    const shuffled = availablePool.sort(() => 0.5 - Math.random());
+    const shuffled = [...availablePool].sort(() => 0.5 - Math.random());
     const finalOptions = shuffled.slice(0, 3);
 
     setLevelUpOptions(finalOptions);
     stateRef.current.showLevelUp = true;
     setShowLevelUp(true);
+  };
+
+  // Apply upgrade directly from Chest
+  const applyChestUpgrade = (option: ActiveUpgrade) => {
+    const state = stateRef.current;
+
+    if (option.id.startsWith('gold')) {
+      state.stats.gold += 150;
+    } else if (option.type === 'weapon') {
+      const target = option.targetType as WeaponType;
+      const existing = state.weapons.find((w) => w.type === target);
+      if (existing) {
+        existing.level = option.level;
+      } else {
+        state.weapons.push({ type: target, level: 1, cooldownTimer: 0 });
+      }
+    } else {
+      const target = option.targetType as PassiveType;
+      const existing = state.passives.find((p) => p.type === target);
+      if (existing) {
+        existing.level = option.level;
+      } else {
+        state.passives.push({ type: target, level: 1 });
+      }
+    }
+
+    // Sync state back to react arrays for rendering in HUD
+    setWeaponsList([...state.weapons]);
+    setPassivesList([...state.passives]);
+
+    // Re-apply passives
+    applyPassivesToPlayerStats();
+  };
+
+  // Handle Chest Pickup Events
+  const handleChestPickup = () => {
+    // Drop logic chances:
+    // Regular: 1 item/equipment
+    // 10% chance: 3 items/equipment
+    // 5% chance: 5 items/equipment
+    let count = 1;
+    const r1 = Math.random();
+    const r2 = Math.random();
+
+    if (r2 < 0.05) {
+      count = 5;
+    } else if (r1 < 0.10) {
+      count = 3;
+    }
+
+    const pool = getAvailableUpgradesPool();
+    const awardedUpgrades: ActiveUpgrade[] = [];
+    const chosenIds = new Set<string>();
+
+    for (let i = 0; i < count; i++) {
+      const eligible = pool.filter((upg) => !chosenIds.has(upg.id));
+      if (eligible.length > 0) {
+        const selected = eligible[Math.floor(Math.random() * eligible.length)];
+        awardedUpgrades.push(selected);
+        chosenIds.add(selected.id);
+        applyChestUpgrade(selected);
+      } else {
+        // Fallback gold reward
+        const goldUpgrade: ActiveUpgrade = {
+          id: `gold-${Math.random()}`,
+          name: '宝箱の特大金貨袋 (Chest Gold)',
+          description: 'すべての装備・支援能力がすでに極限に達しているため、代わりに追加金貨150Gが贈られます！',
+          icon: '💰',
+          type: 'passive',
+          targetType: 'might',
+          level: 1,
+        };
+        awardedUpgrades.push(goldUpgrade);
+        applyChestUpgrade(goldUpgrade);
+      }
+    }
+
+    setChestAwards(awardedUpgrades);
+    setChestUpgradeCount(count);
+    stateRef.current.showChest = true;
+    setShowChest(true);
+    stateRef.current.isPaused = true;
   };
 
   // Names Helper
@@ -448,11 +770,11 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       case 'lightning': return '雷の天罰指輪 (Lightning)';
       case 'might': return 'ほうき星の力 (Might +10%)';
       case 'armor': return 'ホーリーシールド (Armor +1)';
-      case 'speed': return 'エルフェンの駿足靴 (Speed +10%)';
-      case 'magnet': return '引力球の磁石 (Magnet +25%)';
-      case 'maxHp': return '巨人の生命心臓 (MaxHP +20)';
-      case 'cooldown': return 'クロノスの時空時計 (Cooldown -8%)';
-      default: return '未知の魔導アップグレード';
+      case 'speed': return 'エンジェルスピード (Speed +10%)';
+      case 'magnet': return '磁力引力石 (Magnet +25%)';
+      case 'maxHp': return 'エナジーライフ (Max HP +20)';
+      case 'cooldown': return 'ハヤブサ時計 (Cooldown -8%)';
+      default: return '未知の強化アイテム';
     }
   };
 
@@ -464,49 +786,79 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
         if (level === 2) return '攻撃面積が10%拡大し、鞭の弾数が最大3回連続に向上します。';
         if (level === 3) return '鞭ダメージ威力が 30% 強化されます。';
         if (level === 4) return '攻撃面積が15%拡大し、鞭の弾数が最大4回連続に向上します。';
-        return '【究極聖鞭】鞭全弾に無限貫通付与。さらに敵を攻撃した時に微量のHPを吸収します。';
+        if (level === 5) return '【究極聖鞭】鞭全弾に無限貫通付与。さらに敵を攻撃した時に微量のHPを吸収します。';
+        if (level === 6) return '攻撃範囲がさらに10%拡大し、鞭の弾数が最大4回連続からさらに引き上げられます。';
+        if (level === 7) return '鞭の基礎ダメージが 25% 増加します。';
+        if (level === 8) return '敵ヒット時のHP吸収率と回復効果がさらに増加します。';
+        if (level === 9) return '攻撃速度と範囲が大幅に超絶強化されます。';
+        return '【極・覇王聖鞭】全弾超大ダメージ＋常時倍率の一撃。究極を超えた至高の一閃を放ちます。(MAX)';
       case 'fireball':
         if (level === 1) return '最も近い敵に自動誘導する聖火弾を放ちます。';
         if (level === 2) return '火炎弾の装填クールダウン時間が 15% 減少。';
         if (level === 3) return '火炎弾の同時発射数が +1 増加し、弾速も上がります。';
         if (level === 4) return '火弾に小さな爆風判定を追加、基礎ダメージ +25%。';
-        return '【極星炎弾】ヒット時に周囲を巻き込む火炎衝撃波を発生させ、連鎖ダメージを発生させます。';
+        if (level === 5) return '【極星炎弾】ヒット時に周囲を巻き込む火炎衝撃波を発生させ、連鎖ダメージを発生させます。';
+        if (level === 6) return '弾速が 20% 増加し、同時発射数がさらに +1 増加します。';
+        if (level === 7) return '爆風の判定サイズ（爆破判定）が 15% 拡大します。';
+        if (level === 8) return '火炎弾の威力と爆風威力が +30% 増加します。';
+        if (level === 9) return '装填クールダウンがさらに 10% 短縮されます。';
+        return '【煉獄極星弾】連鎖炎嵐。爆風が画面を埋め尽くし、敵弾を低確率でかき消します。(MAX)';
       case 'garlic':
         if (level === 1) return '自身の足元に高ダメージのニンニク魔力結界を展開し、侵入者を削ります。';
         if (level === 2) return 'オーラ半径が +20% 拡大し、ダメージ判定のサイクルを短縮。';
         if (level === 3) return '結界の攻撃力が +25% 増加し、軽微なノックバックを誘発します。';
         if (level === 4) return 'オーラ半径がさらに +15% 増加。';
-        return '【漆黒の蝕国】オーラ内の敵の移動速度を 30% 低下。さらに相手の敵弾を相殺して保護します。';
+        if (level === 5) return '【漆黒の蝕国】オーラ内の敵の移動速度を 30% 低下。さらに相手の敵弾を相殺して保護します。';
+        if (level === 6) return 'デバフ効果を拡張し、範囲内エネミーの移動速度を 40% 低下させます。';
+        if (level === 7) return 'オーラ結界のダメージ判定周期がさらに 15% 高速化。';
+        if (level === 8) return 'オーラ半径がさらに +20% 拡大します。';
+        if (level === 9) return '結界の総合ダメージ威力が +35% 向上。';
+        return '【混沌魔界障壁】侵入した敵の被ダメージを2.5倍に跳ね上げ、完全なる絶対無敵領域へ。(MAX)';
       case 'axe':
         if (level === 1) return '上空へ向け放物線に高威力の聖斧を投げ渡します。敵を多く貫通します。';
         if (level === 2) return '同時投擲数が +1 増加。基礎攻撃力 +15%。';
         if (level === 3) return '斧のサイズが 30% 巨大化。ノックバック率が倍増。';
         if (level === 4) return '投擲時の同時飛散数が +2 増加。ダメージ +30%。';
-        return '【死神の鎌】無限貫通の刃。時折、全画面にランダムな巨大刃の雨を降らせる事があります。';
+        if (level === 5) return '【死神の鎌】無限貫通の刃。時折、全画面にランダムな巨大刃の雨を降らせる事があります。';
+        if (level === 6) return '投擲数がさらに +1 増加、攻撃の射程が大幅向上します。';
+        if (level === 7) return '鎌のベース威力ダメージがさらに +20% 増加。';
+        if (level === 8) return 'ノックバックパワーが驚異の 1.5倍 に覚醒します。';
+        if (level === 9) return '巨大な鎌の雨の発生確率が 2倍 に大幅向上します。';
+        return '【創世神王の鎌】天空より敵を瞬時に両断する、超巨大覇王鎌を引き連れて乱舞します。(MAX)';
       case 'bible':
         if (level === 1) return 'プレイヤーを囲みながら旋回する聖書バリアを1枚、召喚します。';
         if (level === 2) return '本が +1 増え、周囲の回転スピードが 20% 向上。';
         if (level === 3) return '周回時間が 1.5秒 延長され、ヒット間隔が減少、威力 +20%。';
         if (level === 4) return '本がさらに +1。旋回円周半径が拡大し、より遠隔を防ぎます。';
-        return '【終焉の啓示】制限時間が完全に消失。聖なる本が常に周囲を周回し身を守ります。';
+        if (level === 5) return '【終焉の啓示】制限時間が完全に消失。聖なる本が常に周囲を周回し身を守ります。';
+        if (level === 6) return '周回する本の数がさらに +1 枚追加されます。';
+        if (level === 7) return 'バリア本のサイズが 25% 拡張され、防御壁の死角を塞ぎます。';
+        if (level === 8) return '旋回スピードがさらに 25% 上昇し、ノックバック性能が追加されます。';
+        if (level === 9) return 'バリアに守られている間、プレイヤーの全ダメージカット力が向上します。';
+        return '【創世黙示録】絶対防護光輪。聖書がプレイヤーを取り巻く光輪となり、すべてを粉砕します。(MAX)';
       case 'lightning':
         if (level === 1) return 'ランダムな敵1体の上に天界の稲妻を落とします。極めて大ダメージ。';
         if (level === 2) return '落雷の同時回数が +1 回増加。';
         if (level === 3) return '雷の爆砕サイズが +25% 増加。威力が +30% 向上。';
         if (level === 4) return '落雷の回数がさらに +1 回増加。';
-        return '【裁きの大嵐】豪雨。雷と同時に対象周囲の広範囲へ連鎖電撃を走らせます。';
+        if (level === 5) return '【裁きの大嵐】豪雨。雷と同時に対象周囲の広範囲へ連鎖電撃を走らせます。';
+        if (level === 6) return '落雷回数がさらに +1 回増加、連撃スピードが上昇します。';
+        if (level === 7) return '落雷ダメージ威力が 25% 強化され、落雷サイズが 15% 拡大。';
+        if (level === 8) return '落雷時に周囲の敵へ1.5秒間のマヒ（移動停止）を誘発します。';
+        if (level === 9) return '同時落雷数がさらに +1 回追加され、雷の網をつくります。';
+        return '【神罰ハルマゲドン】終焉の断罪。連鎖される電撃が視界内の全敵へ電波し、雷の嵐を浴びせます。(MAX)';
       case 'might':
-        return `力を 10% 向上。すべての武器およびスキルの与ダメージが増加します。(現在のLV: ${level})`;
+        return `力を 10% 向上。すべての武器およびスキルの与ダメージが増加します。(現在のLV: ${level}${level === 8 ? ' - MAX' : ''})`;
       case 'armor':
-        return `聖衣の防護を強化。敵から受けるすべてのダメージをフラットで常に1削減します。(現在のLV: ${level})`;
+        return `聖衣の防護を強化。敵から受けるすべてのダメージをフラットで常に1削減します。(現在のLV: ${level}${level === 8 ? ' - MAX' : ''})`;
       case 'speed':
-        return `移動の俊敏性を 10% 向上。モンスターと距離を保ちやすくなります。(現在のLV: ${level})`;
+        return `移動の俊敏性を 10% 向上。モンスターと距離を保ちやすくなります。(現在のLV: ${level}${level === 8 ? ' - MAX' : ''})`;
       case 'magnet':
-        return `引き寄せる引力を 25% 拡大。ジェムやアイテムの自動収集半径が広がります。(現在のLV: ${level})`;
+        return `引き寄せる引力を 25% 拡大。ジェムやアイテムの自動収集半径が広がります。(現在のLV: ${level}${level === 8 ? ' - MAX' : ''})`;
       case 'maxHp':
-        return `最大健康寿命を +20 増加。同時に失われたHPを全回復します。(現在のLV: ${level})`;
+        return `最大健康寿命を +20 増加。同時に失われたHPを全回復します。(現在のLV: ${level}${level === 8 ? ' - MAX' : ''})`;
       case 'cooldown':
-        return `すべての武器のクールダウン待機時間を 8% 短縮。攻撃回転率が上がります。(現在のLV: ${level})`;
+        return `すべての武器のクールダウン待機時間を 8% 短縮。攻撃回転率が上がります。(現在のLV: ${level}${level === 8 ? ' - MAX' : ''})`;
       default:
         return '基礎能力を引き上げます。';
     }
@@ -771,8 +1123,8 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
               color: '#38bdf8', // sky-blue bible
               rotation: 0,
               rotationSpeed: 0.08, // Orbit speed
-              duration: w.level === 5 ? 99999 : 300, // Level 5 infinite duration!
-              maxDuration: w.level === 5 ? 99999 : 300,
+              duration: w.level >= 5 ? 99999 : 300, // Level 5+ infinite duration!
+              maxDuration: w.level >= 5 ? 99999 : 300,
               pierce: 9999, // Infinite pierce
               angleOffset: angleOffset,
             });
@@ -1175,43 +1527,7 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       let moveSpeed = enemy.speed;
       let shouldMove = true;
 
-      // --- SKELETON AI: THROWS BONES ---
-      if (enemy.type === 'skeleton') {
-        if (!enemy.shootCooldown) enemy.shootCooldown = 90 + Math.random() * 60;
-        enemy.shootCooldown--;
-        
-        // Stop moving and shoot a bone if within range of player
-        if (pDist < 250) {
-          if (enemy.shootCooldown <= 0) {
-            enemy.shootCooldown = 150 + Math.random() * 60; // reset
-            shouldMove = false; // pause to throw
-            
-            // Create bone projectile going towards player
-            sfx.playAxeThrow(); // reuse throwing sound
-            const pX = state.player.x;
-            const pY = state.player.y;
-            const boneAngle = Math.atan2(pY - enemy.y, pX - enemy.x) + (Math.random() - 0.5) * 0.1;
-            const boneSpeed = 3.5;
-            
-            state.enemyProjectiles.push({
-              id: Math.random().toString(),
-              x: enemy.x,
-              y: enemy.y,
-              vx: Math.cos(boneAngle) * boneSpeed,
-              vy: Math.sin(boneAngle) * boneSpeed,
-              size: 11,
-              damage: enemy.damage * 0.8,
-              color: '#ffffff',
-              rotation: Math.random() * Math.PI,
-              duration: 200,
-              emoji: '🦴',
-            });
-          } else if (enemy.shootCooldown < 30) {
-            // slow down when preparing to throw
-            moveSpeed *= 0.3;
-          }
-        }
-      }
+      // --- SKELETON AI: THROWS BONES REMOVED ---
 
       // --- WEREWOLF AI: DASH CHARGE ---
       if (enemy.type === 'werewolf') {
@@ -1363,6 +1679,301 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
         }
       }
 
+      // --- MEDUSA BOSS AI (60s) ---
+      if (enemy.type === 'medusa_boss') {
+        if (enemy.shootCooldown === undefined) enemy.shootCooldown = 90;
+        enemy.shootCooldown--;
+
+        if (enemy.shootCooldown <= 0) {
+          enemy.shootCooldown = 150; // Every 2.5 seconds
+          sfx.playLightningStrike(); // Crackle sound
+
+          // Fires 3 snake/stone rays in a forward arc
+          for (let i = -1; i <= 1; i++) {
+            const bulletAngle = angle + (i * 0.25);
+            const bSpeed = 2.0;
+            state.enemyProjectiles.push({
+              id: Math.random().toString(),
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(bulletAngle) * bSpeed,
+              vy: Math.sin(bulletAngle) * bSpeed,
+              size: 15,
+              damage: enemy.damage * 0.8,
+              color: '#86efac',
+              rotation: Math.random() * Math.PI,
+              duration: 180,
+              emoji: '👁️', // Gaze
+            });
+          }
+
+          // Visual effect
+          for (let p = 0; p < 15; p++) {
+            const ang = Math.random() * Math.PI * 2;
+            state.particles.push({
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(ang) * 2,
+              vy: Math.sin(ang) * 2,
+              size: 2 + Math.random() * 3,
+              color: '#22c55e',
+              opacity: 0.8,
+              duration: 25,
+            });
+          }
+        }
+      }
+
+      // --- STONE GOLEM BOSS AI (120s) ---
+      if (enemy.type === 'golem_boss') {
+        if (enemy.shootCooldown === undefined) enemy.shootCooldown = 120;
+        enemy.shootCooldown--;
+
+        if (enemy.shootCooldown <= 0) {
+          enemy.shootCooldown = 180; // Every 3 seconds
+          sfx.playLightningStrike(); // Heavy stomp sound
+
+          // Stomp earthquake! Spawns 8 flying boulders outwards
+          const boulderCount = 8;
+          for (let i = 0; i < boulderCount; i++) {
+            const bAngle = (i / boulderCount) * Math.PI * 2;
+            const bSpeed = 1.6;
+            state.enemyProjectiles.push({
+              id: Math.random().toString(),
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(bAngle) * bSpeed,
+              vy: Math.sin(bAngle) * bSpeed,
+              size: 18,
+              damage: enemy.damage * 1.2, // Heavy DMG!
+              color: '#93c5fd',
+              rotation: Math.random() * Math.PI,
+              duration: 200,
+              emoji: '🪨',
+            });
+          }
+
+          // Earth shockwave particles
+          for (let p = 0; p < 30; p++) {
+            const ang = Math.random() * Math.PI * 2;
+            const spd = 0.5 + Math.random() * 4;
+            state.particles.push({
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(ang) * spd,
+              vy: Math.sin(ang) * spd,
+              size: 4 + Math.random() * 4,
+              color: '#3b82f6',
+              opacity: 0.8,
+              duration: 40,
+            });
+          }
+
+          state.floatingTexts.push({
+            id: Math.random().toString(),
+            text: '💥 GOLEM CRUSH! 💥',
+            x: enemy.x,
+            y: enemy.y - 30,
+            color: '#60a5fa',
+            duration: 60,
+            size: 12,
+          });
+        }
+      }
+
+      // --- DARK ARCHMAGE BOSS AI (180s) ---
+      if (enemy.type === 'archmage_boss') {
+        if (enemy.shootCooldown === undefined) enemy.shootCooldown = 80;
+        if (enemy.teleportTimer === undefined) enemy.teleportTimer = 220;
+        
+        enemy.shootCooldown--;
+        enemy.teleportTimer--;
+
+        // Magical starburst ring
+        if (enemy.shootCooldown <= 0) {
+          enemy.shootCooldown = 140; // Every 2.3 seconds
+          sfx.playFireball();
+
+          const stars = 10;
+          for (let i = 0; i < stars; i++) {
+            const sAngle = (i / stars) * Math.PI * 2;
+            const sSpeed = 2.4;
+            state.enemyProjectiles.push({
+              id: Math.random().toString(),
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(sAngle) * sSpeed,
+              vy: Math.sin(sAngle) * sSpeed,
+              size: 14,
+              damage: enemy.damage * 0.9,
+              color: '#c084fc',
+              rotation: Math.random() * Math.PI,
+              duration: 220,
+              emoji: '🔮',
+            });
+          }
+        }
+
+        // Archmage Teleportation
+        if (enemy.teleportTimer <= 0) {
+          enemy.teleportTimer = 250 + Math.random() * 80;
+          sfx.playLightningStrike();
+
+          const tpAngle = Math.random() * Math.PI * 2;
+          const tpX = state.player.x + Math.cos(tpAngle) * 110;
+          const tpY = state.player.y + Math.sin(tpAngle) * 110;
+
+          state.floatingTexts.push({
+            id: Math.random().toString(),
+            text: '✨ PORTAL DISTORTION ✨',
+            x: tpX,
+            y: tpY - 20,
+            color: '#a855f7',
+            duration: 50,
+            size: 12,
+          });
+
+          // Disappear sparks
+          for (let p = 0; p < 20; p++) {
+            const ang = Math.random() * Math.PI * 2;
+            state.particles.push({
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(ang) * 3,
+              vy: Math.sin(ang) * 3,
+              size: 2 + Math.random() * 4,
+              color: '#d8b4fe',
+              opacity: 0.9,
+              duration: 35,
+            });
+          }
+
+          enemy.x = tpX;
+          enemy.y = tpY;
+
+          // Reappear sparks
+          for (let p = 0; p < 20; p++) {
+            const ang = Math.random() * Math.PI * 2;
+            state.particles.push({
+              x: tpX,
+              y: tpY,
+              vx: Math.cos(ang) * 3,
+              vy: Math.sin(ang) * 3,
+              size: 2 + Math.random() * 4,
+              color: '#c084fc',
+              opacity: 0.9,
+              duration: 35,
+            });
+          }
+        }
+      }
+
+      // --- RED DRAGON BOSS AI (240s) ---
+      if (enemy.type === 'dragon_boss') {
+        if (enemy.shootCooldown === undefined) enemy.shootCooldown = 60;
+        enemy.shootCooldown--;
+
+        if (enemy.shootCooldown <= 0) {
+          enemy.shootCooldown = 110; // Every 1.8 seconds! Quite active
+          sfx.playFireball();
+
+          // Dragon flame breath cone
+          for (let i = -2; i <= 2; i++) {
+            const fAngle = angle + (i * 0.15);
+            const fSpeed = 3.0 + Math.random() * 1.5;
+            state.enemyProjectiles.push({
+              id: Math.random().toString(),
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(fAngle) * fSpeed,
+              vy: Math.sin(fAngle) * fSpeed,
+              size: 16,
+              damage: enemy.damage * 0.85,
+              color: '#f87171',
+              rotation: Math.random() * Math.PI,
+              duration: 120,
+              emoji: '🔥',
+            });
+          }
+
+          // Flame roar particles
+          for (let p = 0; p < 25; p++) {
+            const pAngle = angle + (Math.random() - 0.5) * 0.6;
+            const pSpeed = 2 + Math.random() * 5;
+            state.particles.push({
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(pAngle) * pSpeed,
+              vy: Math.sin(pAngle) * pSpeed,
+              size: 3 + Math.random() * 6,
+              color: '#ef4444',
+              opacity: 0.9,
+              duration: 30,
+            });
+          }
+        }
+      }
+
+      // --- GENUINE PHOENIX BOSS AI (300s+) ---
+      if (enemy.type === 'phoenix_boss') {
+        if (enemy.shootCooldown === undefined) enemy.shootCooldown = 50;
+        if (enemy.chargeTimer === undefined) enemy.chargeTimer = 0;
+        if (enemy.chargeCooldown === undefined) enemy.chargeCooldown = 100;
+
+        enemy.shootCooldown--;
+
+        // Fast spark lunge!
+        if (enemy.chargeTimer > 0) {
+          enemy.chargeTimer--;
+          moveSpeed = enemy.speed * 2.8; // High speed flying
+
+          if (state.waveTimer % 4 === 0) {
+            state.particles.push({
+              x: enemy.x,
+              y: enemy.y,
+              vx: -Math.cos(angle) * 2,
+              vy: -Math.sin(angle) * 2,
+              size: 4 + Math.random() * 5,
+              color: '#f97316',
+              opacity: 0.8,
+              duration: 25,
+            });
+          }
+        } else {
+          enemy.chargeCooldown--;
+          if (enemy.chargeCooldown <= 0) {
+            enemy.chargeTimer = 45; // Lunge for 45 frames
+            enemy.chargeCooldown = 120;
+            sfx.playWhip();
+          }
+        }
+
+        // Ring of sacred fire
+        if (enemy.shootCooldown <= 0) {
+          enemy.shootCooldown = 90; // Active flame bursts
+          sfx.playFireball();
+
+          const fCount = 12;
+          for (let i = 0; i < fCount; i++) {
+            const frAngle = (i / fCount) * Math.PI * 2;
+            const frSpeed = 2.5;
+            state.enemyProjectiles.push({
+              id: Math.random().toString(),
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(frAngle) * frSpeed,
+              vy: Math.sin(frAngle) * frSpeed,
+              size: 15,
+              damage: enemy.damage * 0.95,
+              color: '#f97316',
+              rotation: Math.random() * Math.PI,
+              duration: 160,
+              emoji: '✨',
+            });
+          }
+        }
+      }
+
       // --- GRIM REAPER BOSS AI: CONSTANT RAGE ---
       if (enemy.type === 'reaper') {
         if (enemy.shootCooldown === undefined) enemy.shootCooldown = 40;
@@ -1495,6 +2106,20 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
 
         // Spawn XP Gem/Pickup
         const rand = Math.random();
+
+        // 5% chance to drop a treasure chest!
+        if (Math.random() < 0.05) {
+          state.gems.push({
+            id: Math.random().toString(),
+            x: enemy.x,
+            y: enemy.y,
+            value: 0,
+            color: '#f59e0b',
+            isGold: false,
+            isChest: true,
+          });
+        }
+
         if (enemy.isBoss) {
           // Drop Chest containing Chicken heal asset or massive red chest item
           state.gems.push({
@@ -1591,7 +2216,9 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
 
       // Collect gems check
       if (gDist < state.player.radius + 10) {
-        if (gem.isChicken) {
+        if (gem.isChest) {
+          handleChestPickup();
+        } else if (gem.isChicken) {
           // Heals 30% or 30HP
           sfx.playChicken();
           state.player.stats.hp = Math.min(state.player.stats.maxHp, state.player.stats.hp + 35);
@@ -1724,7 +2351,13 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       ctx.shadowBlur = 10;
       ctx.shadowColor = gem.color;
 
-      if (gem.isChicken) {
+      if (gem.isChest) {
+        // Draw chest icon
+        ctx.font = '22px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🎁', gem.x - cx, gem.y - cy);
+      } else if (gem.isChicken) {
         // Draw chicken icon text
         ctx.font = '18px Arial';
         ctx.textAlign = 'center';
@@ -1773,29 +2406,54 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       ctx.shadowBlur = enemy.isBoss ? 15 : 0;
       ctx.shadowColor = enemy.color;
 
-      // Body circle
-      ctx.fillStyle = enemy.color;
-      ctx.beginPath();
-      ctx.arc(rx, ry, enemy.size, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Enemy class text overlay decoration (Vampire bat / zombies)
-      ctx.font = `${enemy.size * 1.5}px Arial`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
       // Slight wiggle animation
       const wiggle = Math.sin(enemy.animationFrame) * 3;
 
-      let monsterEmoji = '🦇'; // default bat
-      if (enemy.type === 'zombie') monsterEmoji = '🧟';
-      if (enemy.type === 'ghost') monsterEmoji = '👻';
-      if (enemy.type === 'skeleton') monsterEmoji = '💀';
-      if (enemy.type === 'werewolf') monsterEmoji = '🐺';
-      if (enemy.type === 'vampire_boss') monsterEmoji = '🧛';
-      if (enemy.type === 'reaper') monsterEmoji = '👹';
+      // Check if image is ready and loaded
+      const enemyImg = state.enemyImages[enemy.type];
+      const isReadyImage = enemyImg && (
+        (enemyImg instanceof HTMLImageElement && enemyImg.complete && enemyImg.naturalWidth > 0) ||
+        (enemyImg instanceof HTMLCanvasElement && enemyImg.width > 0)
+      );
 
-      ctx.fillText(monsterEmoji, rx, ry + wiggle);
+      if (isReadyImage && enemyImg) {
+        // Draw custom pixel art sprite centered
+        // We scale the size slightly based on enemy radius to look proportional and majestic
+        let sizeMultiplier = 3.8;
+        if (enemy.type === 'werewolf') sizeMultiplier = 4.8;
+        else if (enemy.isBoss) sizeMultiplier = 4.4;
+        
+        const drawW = enemy.size * sizeMultiplier;
+        const drawH = enemy.size * sizeMultiplier;
+        ctx.drawImage(enemyImg, rx - drawW / 2, ry + wiggle - drawH / 2, drawW, drawH);
+      } else {
+        // Fallback outer circle background
+        ctx.fillStyle = enemy.color;
+        ctx.beginPath();
+        ctx.arc(rx, ry, enemy.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Enemy class text overlay decoration (Vampire bat / zombies)
+        ctx.font = `${enemy.size * 2.1}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        let monsterEmoji = 'BAT'; // fallback
+        if (enemy.type === 'bat') monsterEmoji = '🦇';
+        if (enemy.type === 'zombie') monsterEmoji = '🧟';
+        if (enemy.type === 'ghost') monsterEmoji = '👻';
+        if (enemy.type === 'skeleton') monsterEmoji = '💀';
+        if (enemy.type === 'werewolf') monsterEmoji = '🐺';
+        if (enemy.type === 'vampire_boss') monsterEmoji = '🧛';
+        if (enemy.type === 'reaper') monsterEmoji = '👹';
+        if (enemy.type === 'medusa_boss') monsterEmoji = '🐍';
+        if (enemy.type === 'golem_boss') monsterEmoji = '🪨';
+        if (enemy.type === 'archmage_boss') monsterEmoji = '🔮';
+        if (enemy.type === 'dragon_boss') monsterEmoji = '🐉';
+        if (enemy.type === 'phoenix_boss') monsterEmoji = '🔥';
+
+        ctx.fillText(monsterEmoji, rx, ry + wiggle);
+      }
 
       // Enemy HP Bar in Bosses
       if (enemy.isBoss && enemy.hp > 0) {
@@ -1917,9 +2575,9 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       (img instanceof HTMLCanvasElement && img.width > 0)
     );
     if (isReady && img) {
-      // Draw custom pixel art image centered over (px, py + bobY) with further increased width
-      const imgHeight = state.player.radius * 4.5;
-      const imgWidth = state.player.radius * 8.5; // Significantly wider horizontally
+      // Draw custom pixel art image centered over (px, py + bobY) with adjusted height
+      const imgHeight = state.player.radius * 9.0; // Slightly smaller vertically as requested
+      const imgWidth = state.player.radius * 8.5; 
       ctx.drawImage(img, px - imgWidth / 2, py + bobY - imgHeight / 2, imgWidth, imgHeight);
     } else {
       // Body fallback
@@ -2209,28 +2867,70 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       });
     }
 
-    // Spawn minibosses at designated times (e.g. every 90 seconds)
-    if (elapsedSeconds > 0 && elapsedSeconds % 90 === 0 && state.waveTimer % 60 === 0) {
-      // Spawn Elite Mini-Boss "エリート・ヴァンパイア"
+    // Spawn minibosses at designated times (e.g. every 60 seconds / 1 minute)
+    if (elapsedSeconds > 0 && elapsedSeconds % 60 === 0 && state.waveTimer % 60 === 0) {
+      const minuteIndex = Math.floor(elapsedSeconds / 60);
       const angle = Math.random() * Math.PI * 2;
       const spawnX = state.player.x + Math.cos(angle) * 350;
       const spawnY = state.player.y + Math.sin(angle) * 350;
 
+      let bossType: 'medusa_boss' | 'golem_boss' | 'archmage_boss' | 'dragon_boss' | 'phoenix_boss' | 'vampire_boss' = 'medusa_boss';
+      let bossName = '【深淵の妖女】メデューサ';
+      let bossHp = 400;
+      let bossSpeed = 1.1;
+      let bossDamage = 18;
+      let bossSize = 28;
+      let bossColor = '#4ade80';
+
+      if (minuteIndex === 2) {
+        bossType = 'golem_boss';
+        bossName = '【古代の巨神】ゴーレム';
+        bossHp = 800;
+        bossSpeed = 0.8;
+        bossDamage = 28;
+        bossSize = 34;
+        bossColor = '#60a5fa';
+      } else if (minuteIndex === 3) {
+        bossType = 'archmage_boss';
+        bossName = '【魔界の覇王】アークメイジ';
+        bossHp = 650;
+        bossSpeed = 1.2;
+        bossDamage = 24;
+        bossSize = 28;
+        bossColor = '#c084fc';
+      } else if (minuteIndex === 4) {
+        bossType = 'dragon_boss';
+        bossName = '【煉獄の滅竜】レッドドラゴン';
+        bossHp = 1250;
+        bossSpeed = 1.4;
+        bossDamage = 34;
+        bossSize = 36;
+        bossColor = '#f87171';
+      } else if (minuteIndex >= 5) {
+        bossType = 'phoenix_boss';
+        bossName = '【不死の極炎】フェニックス';
+        bossHp = 1000;
+        bossSpeed = 1.8;
+        bossDamage = 30;
+        bossSize = 32;
+        bossColor = '#f97316';
+      }
+
       state.enemies.push({
         id: Math.random().toString(),
-        type: 'vampire_boss',
+        type: bossType,
         x: spawnX,
         y: spawnY,
-        hp: 350 + elapsedSeconds * 1.5,
-        maxHp: 350 + elapsedSeconds * 1.5,
-        speed: 1.2,
-        damage: 18 + elapsedSeconds * 0.1,
-        size: 24,
-        color: '#f43f5e', // glowing bloody red
+        hp: bossHp + elapsedSeconds * 2,
+        maxHp: bossHp + elapsedSeconds * 2,
+        speed: bossSpeed,
+        damage: bossDamage + elapsedSeconds * 0.1,
+        size: bossSize,
+        color: bossColor,
         isBoss: true,
-        scoreValue: 500,
-        expValue: 20, // MASSIVE red gem drop
-        goldChance: 1.0, // Guranteed massive gold!
+        scoreValue: 1000,
+        expValue: 30, // MASSIVE red gem drop
+        goldChance: 1.0, // Guaranteed massive gold!
         animationFrame: 0,
         knockbackX: 0,
         knockbackY: 0,
@@ -2239,12 +2939,12 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
       // Announce boss warning
       state.floatingTexts.push({
         id: Math.random().toString(),
-        text: '⚠️ エリートボス出現！ (BOSS ENCOUNTER)',
+        text: `⚠️ Boss: ${bossName} 出現！`,
         x: state.player.x,
         y: state.player.y - 65,
-        color: '#ef4444',
-        duration: 90,
-        size: 14,
+        color: bossColor,
+        duration: 120,
+        size: 16,
       });
     }
 
@@ -2452,6 +3152,24 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
           )}
         </AnimatePresence>
 
+        {/* Chest reward screen Modal */}
+        <AnimatePresence>
+          {showChest && (
+            <ChestScreen
+              upgrades={chestAwards}
+              count={chestUpgradeCount}
+              onClose={() => {
+                setShowChest(false);
+                stateRef.current.showChest = false;
+                // Only unpause if standard pause is not active
+                if (!isPaused) {
+                  stateRef.current.isPaused = false;
+                }
+              }}
+            />
+          )}
+        </AnimatePresence>
+
         {/* Game Paused Overlay */}
         <AnimatePresence>
           {isPaused && (
@@ -2461,17 +3179,31 @@ export function GameCanvas({ playerClass, onGameOver }: GameCanvasProps) {
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-40"
             >
-              <div className="text-center">
+              <div className="text-center px-4">
                 <h2 className="text-3xl font-black font-mono tracking-widest text-zinc-100 uppercase mb-2">GAME PAUSED</h2>
                 <p className="text-zinc-500 text-xs font-mono mb-6">一時停止中。ボタンを押すかクリックで再開します。</p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleManualPause}
-                  className="px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 font-bold rounded-xl cursor-pointer text-xs"
-                >
-                  ゲームを再開
-                </motion.button>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleManualPause}
+                    className="w-40 py-2.5 bg-zinc-100 hover:bg-white text-zinc-950 font-black rounded-xl cursor-pointer text-xs transition-colors"
+                  >
+                    ゲームを再開
+                  </motion.button>
+                  <motion.button
+                    id="btn-paused-title-return"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      sfx.playSelect();
+                      onBackToTitle();
+                    }}
+                    className="w-40 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 font-bold rounded-xl cursor-pointer text-xs transition-colors"
+                  >
+                    タイトルに戻る
+                  </motion.button>
+                </div>
               </div>
             </motion.div>
           )}

@@ -78,7 +78,7 @@ export interface Position {
 
 export interface Enemy {
   id: string;
-  type: 'bat' | 'zombie' | 'ghost' | 'skeleton' | 'werewolf' | 'vampire_boss' | 'reaper';
+  type: 'bat' | 'zombie' | 'ghost' | 'skeleton' | 'werewolf' | 'vampire_boss' | 'reaper' | 'medusa_boss' | 'golem_boss' | 'archmage_boss' | 'dragon_boss' | 'phoenix_boss';
   x: number;
   y: number;
   hp: number;
@@ -129,6 +129,7 @@ export interface ExpGem {
   isMagnet?: boolean;
   isChicken?: boolean; // Health restore item
   isBomb?: boolean;
+  isChest?: boolean;
 }
 
 export interface FloatingText {
