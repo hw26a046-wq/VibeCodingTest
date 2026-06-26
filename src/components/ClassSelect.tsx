@@ -12,6 +12,10 @@ import knightAlistairImg from '../assets/images/knight_alistair_1781674975459.jp
 import mageLyraBlueImg from '../assets/images/mage_lyra_blue_1781674990330.jpg';
 import assassinKaelenImg from '../assets/images/assassin_kaelen_1781675004366.jpg';
 import hunterMarcusImg from '../assets/images/hunter_marcus_1781675017229.jpg';
+import monkRenImg from '../assets/images/monk_ren_pixel_1782469746924.jpg';
+import priestEliasImg from '../assets/images/priest_elias_pixel_1782469761017.jpg';
+import bardLumiImg from '../assets/images/bard_lumi_pixel_1782469773909.jpg';
+import astrologistOrionImg from '../assets/images/astrologist_orion_pixel_1782469786327.jpg';
 
 export const CLASSES: PlayerClass[] = [
   {
@@ -94,6 +98,86 @@ export const CLASSES: PlayerClass[] = [
       cooldownReduction: 0.0,
     },
   },
+  {
+    id: 'monk',
+    name: '修行僧レン',
+    subtitle: 'Monk Ren',
+    description: '過酷な修行で肉体と精神を極限まで鍛え上げた武闘家。基礎攻撃威力(Might)と移動速度(Speed)が非常に高く、前方に大威力の波動拳(Hadouken)を放ちます。防御は低め。',
+    emoji: '👊',
+    image: monkRenImg,
+    color: '#f59e0b', // Amber/Gold
+    startingWeapon: 'hadouken',
+    baseStats: {
+      maxHp: 110,
+      hp: 110,
+      speed: 3.0,
+      might: 1.8,
+      armor: 1,
+      magnetRange: 65,
+      area: 1.1,
+      cooldownReduction: 0.10,
+    },
+  },
+  {
+    id: 'priest',
+    name: '司祭エリアス',
+    subtitle: 'Priest Elias',
+    description: '神の加護と聖なる教典を操る若き司祭。聖書が常に周囲を自動で回り守りを固めます。初期の防御力(Armor)が高く、粘り強く戦い抜くことができます。',
+    emoji: '🙏',
+    image: priestEliasImg,
+    color: '#eab308', // Bright Yellow
+    startingWeapon: 'bible',
+    baseStats: {
+      maxHp: 130,
+      hp: 130,
+      speed: 2.1,
+      might: 1.3,
+      armor: 4,
+      magnetRange: 75,
+      area: 1.2,
+      cooldownReduction: 0.05,
+    },
+  },
+  {
+    id: 'bard',
+    name: '吟遊詩人ルミ',
+    subtitle: 'Bard Lumi',
+    description: '戦場に流麗な旋律を奏でる流浪の演奏家。周囲の敵に向けて自動でバウンドし拡散する音符(Music Note)を放ちます。クールダウン減少(Cooldown Reduction)が最初から全クラス最高の25%に達しています。',
+    emoji: '🪕',
+    image: bardLumiImg,
+    color: '#ec4899', // Pink
+    startingWeapon: 'note',
+    baseStats: {
+      maxHp: 90,
+      hp: 90,
+      speed: 2.8,
+      might: 1.1,
+      armor: 1,
+      magnetRange: 90,
+      area: 1.0,
+      cooldownReduction: 0.25,
+    },
+  },
+  {
+    id: 'astrologist',
+    name: '占星術師オリオン',
+    subtitle: 'Astrologist Orion',
+    description: '狂気の星光と天体を観測する天術士。キャラの周りをぐるぐる追尾し、敵を蹂躙する強力な召喚竜(Summoned Dragon)を従えています。超広域の攻撃エリア(Area)と、非常に広い経験値吸引範囲(Magnet)を持つ大器晩成タイプ。',
+    emoji: '🌌',
+    image: astrologistOrionImg,
+    color: '#8b5cf6', // Purple/Indigo
+    startingWeapon: 'summon',
+    baseStats: {
+      maxHp: 95,
+      hp: 95,
+      speed: 2.4,
+      might: 1.6,
+      armor: 1,
+      magnetRange: 120,
+      area: 1.4,
+      cooldownReduction: 0.10,
+    },
+  },
 ];
 
 interface ClassSelectProps {
@@ -121,6 +205,11 @@ export function ClassSelect({ onSelect }: ClassSelectProps) {
       case 'fireball': return 'マジックファントム (至近の敵へ魔法追尾弾)';
       case 'garlic': return 'ダークオーラ結界 (周囲にダメージ地帯＋ノックバック)';
       case 'axe': return 'セイントアックス (上空へ投擲、放物線貫通攻撃)';
+      case 'bible': return '聖書の旋回円 (プレイヤーの周囲を自動周回する防護壁)';
+      case 'lightning': return '雷の天罰指輪 (ランダムな敵に超高威力の落雷ダメージ)';
+      case 'hadouken': return '気功波動拳 (前方の敵を貫通し消し去る巨大なエネルギー波)';
+      case 'note': return '流麗な音符弾 (敵に弾んで連鎖し、周囲を魅了する音符攻撃)';
+      case 'summon': return '守護天竜の召喚 (プレイヤーの周りをぐるぐる追尾し、周囲の敵を火球と突進で蹂躙する召喚獣)';
       default: return '未知の兵器';
     }
   };
@@ -139,7 +228,7 @@ export function ClassSelect({ onSelect }: ClassSelectProps) {
             生存者の選択
           </h1>
           <p className="text-xs md:text-sm font-mono text-zinc-400 max-w-xl mx-auto mt-3 leading-relaxed">
-            アビリティと初期ステータスが異なる4名の戦士。
+            アビリティと初期ステータスが異なる8名の戦士。
             プレイスタイルに合わせた生存者を選択し、深淵の邪悪に立ち向かえ。
           </p>
         </motion.div>
@@ -350,6 +439,11 @@ export function ClassSelect({ onSelect }: ClassSelectProps) {
                     {selectedClass.startingWeapon === 'fireball' && '🔥'}
                     {selectedClass.startingWeapon === 'garlic' && '🧄'}
                     {selectedClass.startingWeapon === 'axe' && '🪓'}
+                    {selectedClass.startingWeapon === 'bible' && '📖'}
+                    {selectedClass.startingWeapon === 'lightning' && '⚡'}
+                    {selectedClass.startingWeapon === 'hadouken' && '🌀'}
+                    {selectedClass.startingWeapon === 'note' && '🎵'}
+                    {selectedClass.startingWeapon === 'summon' && '🐉'}
                   </span>
                   {getWeaponLabel(selectedClass.startingWeapon)}
                 </p>

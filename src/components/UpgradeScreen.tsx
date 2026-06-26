@@ -9,6 +9,14 @@ import { ActiveUpgrade, WeaponType, PassiveType } from '../types';
 import { sfx } from '../utils/audio';
 import { Swords, Eye, Shield, Zap, Heart, Clock, CircleDot, RefreshCw } from 'lucide-react';
 
+import whipImage from '../assets/images/whip_pixel_1782472362145.jpg';
+import fireballImage from '../assets/images/fireball_pixel_1782472376447.jpg';
+import garlicImage from '../assets/images/garlic_pixel_1782472386492.jpg';
+import axeImage from '../assets/images/axe_pixel_1782472402626.jpg';
+import bibleImage from '../assets/images/bible_pixel_1782472426654.jpg';
+import hadoukenImage from '../assets/images/hadouken_pixel_1782472416063.jpg';
+import noteImage from '../assets/images/note_pixel_1782472440238.jpg';
+
 interface UpgradeScreenProps {
   options: ActiveUpgrade[];
   onSelect: (option: ActiveUpgrade) => void;
@@ -29,13 +37,15 @@ export function UpgradeScreen({ options, onSelect }: UpgradeScreenProps) {
   const getIcon = (type: 'weapon' | 'passive', targetType: WeaponType | PassiveType) => {
     if (type === 'weapon') {
       switch (targetType) {
-        case 'whip': return '🪢';
-        case 'fireball': return '🔥';
-        case 'garlic': return '🧄';
-        case 'axe': return '🪓';
-        case 'bible': return '📖';
-        case 'lightning': return '⚡';
-        default: return '⚔️';
+        case 'whip': return <img src={whipImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-700 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Whip" />;
+        case 'fireball': return <img src={fireballImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-700 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Fireball" />;
+        case 'garlic': return <img src={garlicImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-700 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Garlic" />;
+        case 'axe': return <img src={axeImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-700 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Axe" />;
+        case 'bible': return <img src={bibleImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-700 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Bible" />;
+        case 'lightning': return <span className="text-2xl">⚡</span>;
+        case 'hadouken': return <img src={hadoukenImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-700 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Hadouken" />;
+        case 'note': return <img src={noteImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-700 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Note" />;
+        default: return <span className="text-2xl">⚔️</span>;
       }
     } else {
       switch (targetType) {
@@ -74,6 +84,8 @@ export function UpgradeScreen({ options, onSelect }: UpgradeScreenProps) {
       case 'axe': return 'from-zinc-500/30 via-zinc-950 to-zinc-950 border-zinc-700/50 hover:border-zinc-500 shadow-zinc-500/5';
       case 'bible': return 'from-purple-600/30 via-zinc-950 to-zinc-950 border-purple-700/50 hover:border-purple-500 shadow-purple-500/5';
       case 'lightning': return 'from-yellow-500/30 via-zinc-950 to-zinc-950 border-yellow-600/50 hover:border-yellow-400 shadow-yellow-500/5';
+      case 'hadouken': return 'from-sky-500/30 via-zinc-950 to-zinc-950 border-sky-600/50 hover:border-sky-400 shadow-sky-500/5';
+      case 'note': return 'from-pink-500/30 via-zinc-950 to-zinc-950 border-pink-600/50 hover:border-pink-400 shadow-pink-500/5';
       case 'might': return 'from-orange-600/30 via-zinc-950 to-zinc-950 border-orange-700/50 hover:border-orange-500 shadow-orange-500/5';
       case 'armor': return 'from-blue-600/30 via-zinc-950 to-zinc-950 border-blue-700/50 hover:border-blue-500 shadow-blue-500/5';
       case 'speed': return 'from-emerald-600/30 via-zinc-950 to-zinc-950 border-emerald-700/50 hover:border-emerald-500 shadow-emerald-500/5';

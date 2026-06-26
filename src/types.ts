@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type WeaponType = 'whip' | 'fireball' | 'garlic' | 'axe' | 'bible' | 'lightning';
+export type WeaponType = 'whip' | 'fireball' | 'garlic' | 'axe' | 'bible' | 'lightning' | 'hadouken' | 'note' | 'summon';
 
 export type PassiveType = 'might' | 'armor' | 'speed' | 'magnet' | 'maxHp' | 'cooldown';
 
@@ -58,6 +58,7 @@ export interface GameStats {
   exp: number;
   nextLevelExp: number;
   gold: number;
+  isVictory?: boolean;
 }
 
 export interface HighScore {
@@ -68,6 +69,7 @@ export interface HighScore {
   level: number;
   gold: number;
   date: string;
+  isVictory?: boolean;
 }
 
 // Entity Interfaces used inside Canvas
@@ -78,7 +80,7 @@ export interface Position {
 
 export interface Enemy {
   id: string;
-  type: 'bat' | 'zombie' | 'ghost' | 'skeleton' | 'werewolf' | 'vampire_boss' | 'reaper' | 'medusa_boss' | 'golem_boss' | 'archmage_boss' | 'dragon_boss' | 'phoenix_boss';
+  type: 'bat' | 'zombie' | 'ghost' | 'skeleton' | 'werewolf' | 'vampire_boss' | 'reaper' | 'medusa_boss' | 'golem_boss' | 'archmage_boss' | 'dragon_boss' | 'phoenix_boss' | 'dark_lord_boss' | 'white_reaper';
   x: number;
   y: number;
   hp: number;
@@ -117,6 +119,8 @@ export interface Projectile {
   maxDuration: number;
   pierce: number; // Remaining Pierce counts
   angleOffset?: number; // for circular motions
+  bounce?: number; // Bounce count for note bouncing
+  customTargetId?: string; // Target tracking
 }
 
 export interface ExpGem {

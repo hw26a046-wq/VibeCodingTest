@@ -35,6 +35,16 @@ import golemImage from '../assets/images/golem_pixel_1781682811481.jpg';
 import archmageImage from '../assets/images/archmage_pixel_1781682828347.jpg';
 import dragonImage from '../assets/images/dragon_pixel_1781682915205.jpg';
 import phoenixImage from '../assets/images/phoenix_pixel_1781682935560.jpg';
+import darklordImage from '../assets/images/darklord_pixel_1782473216056.jpg';
+import whiteReaperImage from '../assets/images/white_reaper_pixel_1782473612350.jpg';
+
+import whipImage from '../assets/images/whip_pixel_1782472362145.jpg';
+import fireballImage from '../assets/images/fireball_pixel_1782472376447.jpg';
+import garlicImage from '../assets/images/garlic_pixel_1782472386492.jpg';
+import axeImage from '../assets/images/axe_pixel_1782472402626.jpg';
+import bibleImage from '../assets/images/bible_pixel_1782472426654.jpg';
+import hadoukenImage from '../assets/images/hadouken_pixel_1782472416063.jpg';
+import noteImage from '../assets/images/note_pixel_1782472440238.jpg';
 
 interface GameCanvasProps {
   playerClass: PlayerClass;
@@ -80,6 +90,7 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
     isPaused: false,
     playerImgElement: null as HTMLImageElement | HTMLCanvasElement | null,
     enemyImages: {} as Record<string, HTMLImageElement | HTMLCanvasElement | null>,
+    weaponImages: {} as Record<string, HTMLImageElement | HTMLCanvasElement | null>,
     player: {
       x: 0,
       y: 0,
@@ -132,6 +143,11 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
     isGameOverCalled: false,
     enemySpawnAccumulator: 0,
     reaperSpawned: false,
+    darkLordSpawned: false,
+    darkLordDefeated: false,
+    whiteReaperSpawned: false,
+    whiteReaperCountdown: null as number | null,
+    whiteReaperTouchTimer: null as number | null,
   });
 
   // Sound check toggle
@@ -400,6 +416,61 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       stateRef.current.enemyImages['phoenix_boss'] = canvas;
     });
 
+    const darklordImg = new Image();
+    darklordImg.src = darklordImage;
+    removeBackground(darklordImg, (canvas) => {
+      stateRef.current.enemyImages['dark_lord_boss'] = canvas;
+    });
+
+    const whiteReaperImg = new Image();
+    whiteReaperImg.src = whiteReaperImage;
+    removeBackground(whiteReaperImg, (canvas) => {
+      stateRef.current.enemyImages['white_reaper'] = canvas;
+    });
+
+    // Load custom weapon images
+    const whipImg = new Image();
+    whipImg.src = whipImage;
+    removeBackground(whipImg, (canvas) => {
+      stateRef.current.weaponImages['whip'] = canvas;
+    });
+
+    const fireballImg = new Image();
+    fireballImg.src = fireballImage;
+    removeBackground(fireballImg, (canvas) => {
+      stateRef.current.weaponImages['fireball'] = canvas;
+    });
+
+    const garlicImg = new Image();
+    garlicImg.src = garlicImage;
+    removeBackground(garlicImg, (canvas) => {
+      stateRef.current.weaponImages['garlic'] = canvas;
+    });
+
+    const axeImg = new Image();
+    axeImg.src = axeImage;
+    removeBackground(axeImg, (canvas) => {
+      stateRef.current.weaponImages['axe'] = canvas;
+    });
+
+    const hadoukenImg = new Image();
+    hadoukenImg.src = hadoukenImage;
+    removeBackground(hadoukenImg, (canvas) => {
+      stateRef.current.weaponImages['hadouken'] = canvas;
+    });
+
+    const bibleImg = new Image();
+    bibleImg.src = bibleImage;
+    removeBackground(bibleImg, (canvas) => {
+      stateRef.current.weaponImages['bible'] = canvas;
+    });
+
+    const noteImg = new Image();
+    noteImg.src = noteImage;
+    removeBackground(noteImg, (canvas) => {
+      stateRef.current.weaponImages['note'] = canvas;
+    });
+
     // Set Initial Weapons
     const initialWeaponState: WeaponState = {
       type: playerClass.startingWeapon,
@@ -417,6 +488,11 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
     stateRef.current.waveTimer = 0;
     stateRef.current.isGameOverCalled = false;
     stateRef.current.reaperSpawned = false;
+    stateRef.current.darkLordSpawned = false;
+    stateRef.current.darkLordDefeated = false;
+    stateRef.current.whiteReaperSpawned = false;
+    stateRef.current.whiteReaperCountdown = null;
+    stateRef.current.whiteReaperTouchTimer = null;
 
     setWeaponsList([initialWeaponState]);
     setPassivesList([]);
@@ -431,9 +507,199 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
     // Keyboard controls
     const handleKeyDown = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
+      const isAlreadyDown = stateRef.current.keys[k];
       stateRef.current.keys[k] = true;
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         stateRef.current.keys[e.key] = true;
+      }
+      
+      // Cheat code / Debug keys hold handling
+      if ((k === 't' || k === 'l') && !isAlreadyDown) {
+        stateRef.current.debugHoldStartTimes = stateRef.current.debugHoldStartTimes || {};
+        stateRef.current.debugHoldStartTimes[k] = Date.now();
+
+        stateRef.current.debugHoldTimers = stateRef.current.debugHoldTimers || {};
+        if (stateRef.current.debugHoldTimers[k]) {
+          stateRef.current.debugHoldTimers[k].forEach((t: any) => clearTimeout(t));
+        }
+        stateRef.current.debugHoldTimers[k] = [];
+
+        const keyName = k.toUpperCase();
+        
+        // Show initial feedback
+        stateRef.current.floatingTexts.push({
+          id: Math.random().toString(),
+          text: `⏳ ${keyName}キー長押し中: 3秒...`,
+          x: stateRef.current.player.x,
+          y: stateRef.current.player.y - 120,
+          color: '#fbbf24',
+          duration: 60,
+          size: 16,
+        });
+
+        // Countdown: 2s
+        stateRef.current.debugHoldTimers[k].push(setTimeout(() => {
+          if (stateRef.current.keys[k]) {
+            stateRef.current.floatingTexts.push({
+              id: Math.random().toString(),
+              text: `⏳ ${keyName}キー長押し中: 2秒...`,
+              x: stateRef.current.player.x,
+              y: stateRef.current.player.y - 120,
+              color: '#fbbf24',
+              duration: 60,
+              size: 16,
+            });
+          }
+        }, 1000));
+
+        // Countdown: 1s
+        stateRef.current.debugHoldTimers[k].push(setTimeout(() => {
+          if (stateRef.current.keys[k]) {
+            stateRef.current.floatingTexts.push({
+              id: Math.random().toString(),
+              text: `⏳ ${keyName}キー長押し中: 1秒...`,
+              x: stateRef.current.player.x,
+              y: stateRef.current.player.y - 120,
+              color: '#f87171',
+              duration: 60,
+              size: 16,
+            });
+          }
+        }, 2000));
+
+        // Trigger action after 3s
+        stateRef.current.debugHoldTimers[k].push(setTimeout(() => {
+          if (stateRef.current.keys[k]) {
+            if (k === 't') {
+              stateRef.current.waveTimer = 595 * 60; // 9:55
+              stateRef.current.stats.timeElapsed = 595;
+              
+              // Grant all weapons at level 10
+              stateRef.current.weapons = [
+                { type: 'whip', level: 10, cooldownTimer: 0 },
+                { type: 'fireball', level: 10, cooldownTimer: 0 },
+                { type: 'garlic', level: 10, cooldownTimer: 0 },
+                { type: 'axe', level: 10, cooldownTimer: 0 },
+                { type: 'bible', level: 10, cooldownTimer: 0 },
+                { type: 'lightning', level: 10, cooldownTimer: 0 },
+                { type: 'hadouken', level: 10, cooldownTimer: 0 },
+                { type: 'note', level: 10, cooldownTimer: 0 },
+                { type: 'summon', level: 10, cooldownTimer: 0 }
+              ];
+
+              // Grant all passives at level 8
+              stateRef.current.passives = [
+                { type: 'might', level: 8 },
+                { type: 'armor', level: 8 },
+                { type: 'speed', level: 8 },
+                { type: 'magnet', level: 8 },
+                { type: 'maxHp', level: 8 },
+                { type: 'cooldown', level: 8 }
+              ];
+
+              // Sync React Lists and stats
+              setWeaponsList([...stateRef.current.weapons]);
+              setPassivesList([...stateRef.current.passives]);
+              applyPassivesToPlayerStats();
+              setPlayerHp(stateRef.current.player.stats.hp);
+              setHudStats({ ...stateRef.current.stats });
+
+              stateRef.current.floatingTexts.push({
+                id: Math.random().toString(),
+                text: '⏩ タイムラッシュ！(9分55秒へスキップ)',
+                x: stateRef.current.player.x,
+                y: stateRef.current.player.y - 80,
+                color: '#38bdf8',
+                duration: 120,
+                size: 15,
+              });
+
+              stateRef.current.floatingTexts.push({
+                id: Math.random().toString(),
+                text: '🔥 全装備アイテム獲得！レベルMAX！ 🔥',
+                x: stateRef.current.player.x,
+                y: stateRef.current.player.y - 125,
+                color: '#facc15',
+                duration: 180,
+                size: 18,
+              });
+            } else if (k === 'l') {
+              const state = stateRef.current;
+              state.whiteReaperSpawned = true;
+              state.darkLordDefeated = true; // Mark as true so that other state variables can align
+              state.whiteReaperCountdown = 0; // Clear any pending spawning countdown
+              
+              // Spawn White Reaper from off-screen
+              const angle = Math.random() * Math.PI * 2;
+              const spawnX = state.player.x + Math.cos(angle) * 450;
+              const spawnY = state.player.y + Math.sin(angle) * 450;
+
+              // Check if a White Reaper is already present to prevent duplicate summons
+              const hasReaper = state.enemies.some(e => e.type === 'white_reaper');
+              if (!hasReaper) {
+                state.enemies.push({
+                  id: Math.random().toString(),
+                  type: 'white_reaper',
+                  x: spawnX,
+                  y: spawnY,
+                  hp: 999999999, // Extremely immortal HP
+                  maxHp: 999999999,
+                  speed: 15.0, // Extremely fast, inescapable death!
+                  damage: 99999, // Massive damage
+                  size: 40,
+                  color: '#ffffff',
+                  isBoss: true,
+                  scoreValue: 0,
+                  expValue: 0,
+                  goldChance: 0,
+                  animationFrame: 0,
+                  knockbackX: 0,
+                  knockbackY: 0,
+                });
+
+                // Ominous warning text
+                state.floatingTexts.push({
+                  id: Math.random().toString(),
+                  text: '☠️ 死神が召喚されました！ (DEATH SUMMONED) ☠️',
+                  x: state.player.x,
+                  y: state.player.y - 120,
+                  color: '#ffffff',
+                  duration: 180,
+                  size: 20,
+                });
+
+                // Massive white flash particles
+                for (let i = 0; i < 40; i++) {
+                  const pAngle = Math.random() * Math.PI * 2;
+                  const pSpeed = 3 + Math.random() * 9;
+                  state.particles.push({
+                    x: state.player.x,
+                    y: state.player.y,
+                    vx: Math.cos(pAngle) * pSpeed,
+                    vy: Math.sin(pAngle) * pSpeed,
+                    size: 3 + Math.random() * 6,
+                    color: '#ffffff',
+                    opacity: 0.95,
+                    duration: 50,
+                  });
+                }
+              } else {
+                state.floatingTexts.push({
+                  id: Math.random().toString(),
+                  text: '⚠️ 死神は既に存在しています',
+                  x: state.player.x,
+                  y: state.player.y - 80,
+                  color: '#f87171',
+                  duration: 120,
+                  size: 16,
+                });
+              }
+            }
+          }
+          if (stateRef.current.debugHoldStartTimes) {
+            delete stateRef.current.debugHoldStartTimes[k];
+          }
+        }, 3000));
       }
     };
 
@@ -442,6 +708,28 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       stateRef.current.keys[k] = false;
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         stateRef.current.keys[e.key] = false;
+      }
+
+      // If a debug key is released, clear timers and trigger cancel notification
+      if (stateRef.current.debugHoldTimers && stateRef.current.debugHoldTimers[k]) {
+        stateRef.current.debugHoldTimers[k].forEach((t: any) => clearTimeout(t));
+        delete stateRef.current.debugHoldTimers[k];
+
+        if (stateRef.current.debugHoldStartTimes && stateRef.current.debugHoldStartTimes[k]) {
+          const heldDuration = Date.now() - stateRef.current.debugHoldStartTimes[k];
+          if (heldDuration < 3000 && heldDuration > 150) {
+            stateRef.current.floatingTexts.push({
+              id: Math.random().toString(),
+              text: '❌ 長押し解除',
+              x: stateRef.current.player.x,
+              y: stateRef.current.player.y - 120,
+              color: '#ef4444',
+              duration: 45,
+              size: 14,
+            });
+          }
+          delete stateRef.current.debugHoldStartTimes[k];
+        }
       }
     };
 
@@ -601,7 +889,7 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
     const totalWeaponsAndPassives = state.weapons.length + state.passives.length;
     const canTakeNew = totalWeaponsAndPassives < 6; // Limit 6 active slots total
 
-    const weaponTypesList: WeaponType[] = ['whip', 'fireball', 'garlic', 'axe', 'bible', 'lightning'];
+    const weaponTypesList: WeaponType[] = ['whip', 'fireball', 'garlic', 'axe', 'bible', 'lightning', 'hadouken', 'note', 'summon'];
     
     weaponTypesList.forEach((wType) => {
       const level = currentWeaponsMap.get(wType) || 0;
@@ -768,6 +1056,9 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       case 'axe': return 'セイントアックス (Axe)';
       case 'bible': return '聖書の旋回円 (Holy Bible)';
       case 'lightning': return '雷の天罰指輪 (Lightning)';
+      case 'hadouken': return '気功波動拳 (Hadouken)';
+      case 'note': return '流麗な音符弾 (Music Note)';
+      case 'summon': return '守護竜の召喚 (Summon Dragon)';
       case 'might': return 'ほうき星の力 (Might +10%)';
       case 'armor': return 'ホーリーシールド (Armor +1)';
       case 'speed': return 'エンジェルスピード (Speed +10%)';
@@ -847,6 +1138,39 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         if (level === 8) return '落雷時に周囲の敵へ1.5秒間のマヒ（移動停止）を誘発します。';
         if (level === 9) return '同時落雷数がさらに +1 回追加され、雷の網をつくります。';
         return '【神罰ハルマゲドン】終焉の断罪。連鎖される電撃が視界内の全敵へ電波し、雷の嵐を浴びせます。(MAX)';
+      case 'hadouken':
+        if (level === 1) return '前方に向けて敵を貫通し消し去る巨大な波動拳を放ちます。';
+        if (level === 2) return '波動拳の威力が 25% 増加し、サイズが 15% 巨大化。';
+        if (level === 3) return 'クールダウン時間が 15% 短縮され、さらに連射が可能に。';
+        if (level === 4) return '貫通可能数が増加し、同時に2方向へ放つようになります。';
+        if (level === 5) return '【真空波動拳】巨大なエネルギー波が一直線のすべての敵を完全に焼き尽くします。';
+        if (level === 6) return '同時発射数が 3方向に増加し、さらに広範囲を制圧します。';
+        if (level === 7) return '波動拳の威力が 30% 増加します。';
+        if (level === 8) return '弾速が 20% 増加し、貫通力が向上します。';
+        if (level === 9) return '波動の光線が敵を攻撃した時に爆発を引き起こすようになります。';
+        return '【滅・覇王波動拳】神気の極み。画面前方の全ての敵を飲み込む、宇宙のエネルギービームと化します。(MAX)';
+      case 'note':
+        if (level === 1) return '敵に向けてバウンドし拡散する音符を1つ放ちます。';
+        if (level === 2) return '音符の数が +1 増え、バウンド数が 1回 増加します。';
+        if (level === 3) return '音符の攻撃力が 25% 増加し、爆発的な音波を伴う。';
+        if (level === 4) return '音符の数が +1 増え、攻撃の貫通力が向上します。';
+        if (level === 5) return '【シンフォニック・コーラス】音符が周囲 of 敵に当たると、周囲に美しい音波の衝撃波を放ちます。';
+        if (level === 6) return '同時発射される音符の数がさらに +1 増えます。';
+        if (level === 7) return '音符のサイズが 20% 巨大化。バウンド回数がさらに +1 増加します。';
+        if (level === 8) return '敵を混乱（一瞬気絶）させる効果が追加されます。';
+        if (level === 9) return 'すべての音符の威力が 30% 上昇。';
+        return '【天界の狂詩曲 -ラプソディ-】美しきオーケストラ。音符が敵にぶつかるたびに弾け、無数の小音符が画面を舞います。(MAX)';
+      case 'summon':
+        if (level === 1) return 'プレイヤーの周囲をぐるぐる追尾して体当たり攻撃する守護竜を1体召喚します。';
+        if (level === 2) return '守護竜の体当たりダメージが 25% 増加し、サイズが 15% 巨大化します。';
+        if (level === 3) return '守護竜が一定時間ごとに近くの敵へ自動で貫通火球を吐き出すようになります。';
+        if (level === 4) return '守護竜の体当たりのノックバック力が大幅に向上します。';
+        if (level === 5) return '【天界の守護神竜】天竜の力が覚醒。一定時間ごとに周囲の敵を吹き飛ばす咆哮を放ちます。';
+        if (level === 6) return '召喚される守護竜が 2体 に増加し、より強固に周囲を追尾・防衛します。';
+        if (level === 7) return '守護竜が吐き出す火球の攻撃力が 40% 上昇し、連射速度がアップします。';
+        if (level === 8) return '守護竜の移動軌道が拡大し、より遠くの敵まで薙ぎ払います。';
+        if (level === 9) return 'すべての体当たりダメージがさらに 30% 増加。';
+        return '【超神竜・バハムート】神格の極み。召喚される守護竜が 3体 となり、プレイヤーの周囲を凄まじい速度で旋回し、触れる敵すべてを焼き尽くします。(MAX)';
       case 'might':
         return `力を 10% 向上。すべての武器およびスキルの与ダメージが増加します。(現在のLV: ${level}${level === 8 ? ' - MAX' : ''})`;
       case 'armor':
@@ -963,6 +1287,12 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       if (w.type === 'axe') baseCooldown = 110 * speedModifier;
       if (w.type === 'bible') baseCooldown = 180 * speedModifier;
       if (w.type === 'lightning') baseCooldown = 130 * speedModifier;
+      if (w.type === 'hadouken') {
+        let cd = 95;
+        if (w.level >= 3) cd = 75;
+        baseCooldown = cd * speedModifier;
+      }
+      if (w.type === 'note') baseCooldown = 70 * speedModifier;
 
       w.cooldownTimer--;
 
@@ -1131,6 +1461,129 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
           }
         }
 
+        if (w.type === 'summon') {
+          // Maintain dragon projectiles in state
+          const numDragons = w.level >= 9 ? 3 : (w.level >= 6 ? 2 : 1);
+          const currentSummons = state.projectiles.filter((p: Projectile) => p.type === 'summon');
+          
+          if (currentSummons.length !== numDragons) {
+            // Re-spawn
+            state.projectiles = state.projectiles.filter((p: Projectile) => p.type !== 'summon');
+            for (let i = 0; i < numDragons; i++) {
+              const angleOffset = (i / numDragons) * Math.PI * 2;
+              state.projectiles.push({
+                id: Math.random().toString(),
+                type: 'summon',
+                x: px + Math.cos(angleOffset) * 90,
+                y: py + Math.sin(angleOffset) * 90,
+                vx: 0,
+                vy: 0,
+                damage: 28 * state.player.stats.might * (1 + (w.level - 1) * 0.22),
+                size: 20 * state.player.stats.area * (w.level >= 4 ? 1.2 : 1.0),
+                color: '#22c55e', // emerald/green dragon
+                rotation: angleOffset,
+                rotationSpeed: 0.04,
+                duration: 999999,
+                maxDuration: 999999,
+                pierce: 99999,
+                angleOffset: angleOffset,
+              });
+            }
+          }
+          
+          // Dragon special attacking actions (Level 3+ fires fireballs, Level 5+ emits Roar)
+          if (w.cooldownTimer <= 0) {
+            let fired = false;
+            
+            // Level 3+ fires piercing fireballs
+            if (w.level >= 3) {
+              const summons = state.projectiles.filter((p: Projectile) => p.type === 'summon');
+              if (summons.length > 0) {
+                fired = true;
+                sfx.playFireball();
+                summons.forEach((drag: Projectile) => {
+                  const target = getNearestEnemy(state);
+                  const angle = target ? Math.atan2(target.y - drag.y, target.x - drag.x) : drag.rotation;
+                  
+                  const numFireballs = w.level >= 7 ? 2 : 1;
+                  for (let f = 0; f < numFireballs; f++) {
+                    const fAngle = angle + (f - (numFireballs - 1) / 2) * 0.25;
+                    state.projectiles.push({
+                      id: Math.random().toString(),
+                      type: 'fireball',
+                      x: drag.x,
+                      y: drag.y,
+                      vx: Math.cos(fAngle) * 5.5,
+                      vy: Math.sin(fAngle) * 5.5,
+                      damage: 25 * state.player.stats.might * (w.level >= 7 ? 1.4 : 1.0),
+                      size: 14 * state.player.stats.area,
+                      color: '#4ade80', // emerald green fireball
+                      rotation: fAngle,
+                      rotationSpeed: 0,
+                      duration: 150,
+                      maxDuration: 150,
+                      pierce: 3,
+                    });
+                  }
+                });
+              }
+            }
+            
+            // Level 5+ Dragon Roar!
+            if (w.level >= 5) {
+              const summons = state.projectiles.filter((p: Projectile) => p.type === 'summon');
+              if (summons.length > 0) {
+                fired = true;
+                sfx.playLightningStrike(); // Roaring sound
+                summons.forEach((drag: Projectile) => {
+                  // Shockwave particles
+                  for (let r = 0; r < 12; r++) {
+                    const rAngle = (r / 12) * Math.PI * 2;
+                    state.particles.push({
+                      x: drag.x,
+                      y: drag.y,
+                      vx: Math.cos(rAngle) * 2.8,
+                      vy: Math.sin(rAngle) * 2.8,
+                      size: 3 + Math.random() * 3,
+                      color: '#4ade80',
+                      opacity: 0.85,
+                      duration: 20,
+                    });
+                  }
+                  
+                  // Damage enemies in roar radius
+                  const roarRadius = 110 * state.player.stats.area;
+                  state.enemies.forEach((enemy: Enemy) => {
+                    const dDist = Math.sqrt((enemy.x - drag.x) ** 2 + (enemy.y - drag.y) ** 2);
+                    if (dDist < roarRadius) {
+                      const roarDmg = 35 * state.player.stats.might;
+                      enemy.hp -= roarDmg;
+                      
+                      const kbAngle = Math.atan2(enemy.y - drag.y, enemy.x - drag.x);
+                      enemy.knockbackX += Math.cos(kbAngle) * 5.5;
+                      enemy.knockbackY += Math.sin(kbAngle) * 5.5;
+                      
+                      state.floatingTexts.push({
+                        id: Math.random().toString(),
+                        text: `ROAR! ${Math.round(roarDmg)}`,
+                        x: enemy.x,
+                        y: enemy.y - 10,
+                        color: '#22c55e',
+                        duration: 25,
+                        size: 12,
+                      });
+                    }
+                  });
+                });
+              }
+            }
+            
+            if (fired) {
+              w.cooldownTimer = Math.max(30, 95 * speedModifier);
+            }
+          }
+        }
+
         if (w.type === 'lightning') {
           // Thunder strikes! Play sound, damage surrounding
           const visibleEnemies = state.enemies.filter((e: Enemy) => {
@@ -1179,6 +1632,69 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
                 maxDuration: 6,
                 pierce: 9999,
               });
+            });
+          }
+        }
+
+        if (w.type === 'hadouken') {
+          sfx.playHadouken();
+          const target = getNearestEnemy(state);
+          const baseAngle = target ? Math.atan2(target.y - py, target.x - px) : 0;
+          const bulletSpeed = 6.5;
+          const dmg = 35 * state.player.stats.might * (1 + (w.level - 1) * 0.25);
+          const areaMult = state.player.stats.area;
+          const baseSize = 16 * areaMult * (1 + (w.level - 1) * 0.15);
+          
+          const numHadoukens = w.level >= 6 ? 3 : (w.level >= 4 ? 2 : 1);
+          for (let i = 0; i < numHadoukens; i++) {
+            const angle = baseAngle + (i - (numHadoukens - 1) / 2) * 0.3;
+            state.projectiles.push({
+              id: Math.random().toString(),
+              type: 'hadouken',
+              x: px,
+              y: py,
+              vx: Math.cos(angle) * bulletSpeed,
+              vy: Math.sin(angle) * bulletSpeed,
+              damage: dmg,
+              size: baseSize,
+              color: '#38bdf8', // sky blue
+              rotation: angle,
+              rotationSpeed: 0,
+              duration: 180,
+              maxDuration: 180,
+              pierce: w.level >= 5 ? 9999 : (4 + w.level * 2),
+            });
+          }
+        }
+
+        if (w.type === 'note') {
+          sfx.playNote();
+          const target = getNearestEnemy(state);
+          const baseAngle = target ? Math.atan2(target.y - py, target.x - px) : Math.random() * Math.PI * 2;
+          const bulletSpeed = 5;
+          const dmg = 24 * state.player.stats.might * (1 + (w.level - 1) * 0.22);
+          const areaMult = state.player.stats.area;
+          const baseSize = 12 * areaMult * (1 + (w.level - 1) * 0.1);
+
+          const numNotes = w.level >= 6 ? 4 : (w.level >= 4 ? 3 : (w.level >= 2 ? 2 : 1));
+          for (let i = 0; i < numNotes; i++) {
+            const angle = baseAngle + (i - (numNotes - 1) / 2) * 0.4;
+            state.projectiles.push({
+              id: Math.random().toString(),
+              type: 'note',
+              x: px,
+              y: py,
+              vx: Math.cos(angle) * bulletSpeed,
+              vy: Math.sin(angle) * bulletSpeed,
+              damage: dmg,
+              size: baseSize,
+              color: '#f472b6', // pink
+              rotation: Math.random() * Math.PI * 2,
+              rotationSpeed: 0.05 + Math.random() * 0.05,
+              duration: 200,
+              maxDuration: 200,
+              pierce: w.level >= 4 ? 4 : 2,
+              bounce: w.level >= 7 ? 4 : (w.level >= 2 ? 3 : 2), // bounce count
             });
           }
         }
@@ -1231,6 +1747,111 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       escalateSpawns(state);
     }
 
+    // Handle White Reaper Spawning Countdown (5 seconds = 300 frames after Dark Lord defeated)
+    if (state.darkLordDefeated && state.whiteReaperCountdown !== null && state.whiteReaperCountdown > 0) {
+      state.whiteReaperCountdown--;
+      if (state.whiteReaperCountdown === 0) {
+        state.whiteReaperSpawned = true;
+        // Spawn White Reaper from off-screen
+        const angle = Math.random() * Math.PI * 2;
+        const spawnX = state.player.x + Math.cos(angle) * 450;
+        const spawnY = state.player.y + Math.sin(angle) * 450;
+
+        state.enemies.push({
+          id: Math.random().toString(),
+          type: 'white_reaper',
+          x: spawnX,
+          y: spawnY,
+          hp: 999999999, // Extremely immortal HP
+          maxHp: 999999999,
+          speed: 15.0, // Extremely fast, inescapable death!
+          damage: 99999, // Unused but massive
+          size: 40,
+          color: '#ffffff',
+          isBoss: true,
+          scoreValue: 0,
+          expValue: 0,
+          goldChance: 0,
+          animationFrame: 0,
+          knockbackX: 0,
+          knockbackY: 0,
+        });
+
+        // Ominous text warning
+        state.floatingTexts.push({
+          id: Math.random().toString(),
+          text: '☠️ 死神があなたの魂を刈り取りに来ました... ☠️',
+          x: state.player.x,
+          y: state.player.y - 120,
+          color: '#ffffff',
+          duration: 180,
+          size: 20,
+        });
+
+        // Massive white flash particles
+        for (let i = 0; i < 40; i++) {
+          const pAngle = Math.random() * Math.PI * 2;
+          const pSpeed = 3 + Math.random() * 9;
+          state.particles.push({
+            x: state.player.x,
+            y: state.player.y,
+            vx: Math.cos(pAngle) * pSpeed,
+            vy: Math.sin(pAngle) * pSpeed,
+            size: 3 + Math.random() * 6,
+            color: '#ffffff',
+            opacity: 0.95,
+            duration: 50,
+          });
+        }
+      }
+    }
+
+    // Handle White Reaper Touch/Instant-Death countdown (2 seconds = 120 frames)
+    if (state.whiteReaperTouchTimer !== null && state.whiteReaperTouchTimer > 0) {
+      state.whiteReaperTouchTimer--;
+      
+      // Screen shaking or flash during death sequence!
+      if (state.whiteReaperTouchTimer % 10 === 0) {
+        // Red and black flash particles on player
+        const pAngle = Math.random() * Math.PI * 2;
+        state.particles.push({
+          x: state.player.x,
+          y: state.player.y,
+          vx: Math.cos(pAngle) * 4,
+          vy: Math.sin(pAngle) * 4,
+          size: 6 + Math.random() * 8,
+          color: '#7f1d1d', // very dark red
+          opacity: 0.9,
+          duration: 30,
+        });
+      }
+
+      if (state.whiteReaperTouchTimer % 30 === 0) {
+        const remainingSecs = (state.whiteReaperTouchTimer / 60).toFixed(1);
+        state.floatingTexts.push({
+          id: Math.random().toString(),
+          text: `⏳ 死の宣告: ${remainingSecs}秒...`,
+          x: state.player.x,
+          y: state.player.y - 65,
+          color: '#ef4444',
+          duration: 30,
+          size: 18,
+        });
+      }
+
+      if (state.whiteReaperTouchTimer === 0) {
+        // Instant Death trigger by White Reaper - triggers Game Clear / Victory!
+        state.stats.isVictory = true;
+        state.player.stats.hp = 0;
+        setPlayerHp(0);
+        if (!state.isGameOverCalled) {
+          state.isGameOverCalled = true;
+          sfx.playGameOver();
+          handleRunGameOver();
+        }
+      }
+    }
+
     // 1. UPDATE PLAYER MOVEMENT
     let dx = 0;
     let dy = 0;
@@ -1256,7 +1877,10 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
     }
 
     // Apply movement
-    const baseSpeed = state.player.stats.speed;
+    let baseSpeed = state.player.stats.speed;
+    if (state.whiteReaperTouchTimer !== null) {
+      baseSpeed *= 0.12; // Inescapable slowed down state
+    }
     state.player.x += dx * baseSpeed;
     state.player.y += dy * baseSpeed;
 
@@ -1334,6 +1958,32 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         proj.x = state.player.x + Math.cos(proj.angleOffset) * radius;
         proj.y = state.player.y + Math.sin(proj.angleOffset) * radius;
         proj.rotation += 0.1;
+      } else if (proj.type === 'summon') {
+        // Find summon level to scale behavior
+        const summonLvl = state.weapons.find((w: any) => w.type === 'summon')?.level || 1;
+        const baseSpeed = 0.025 + (summonLvl >= 10 ? 0.015 : 0);
+        proj.angleOffset = (proj.angleOffset || 0) + baseSpeed;
+
+        const baseRadius = summonLvl >= 8 ? 115 : 85;
+        const radius = baseRadius * state.player.stats.area;
+
+        const targetX = state.player.x + Math.cos(proj.angleOffset) * radius;
+        const targetY = state.player.y + Math.sin(proj.angleOffset) * radius;
+
+        const oldX = proj.x;
+        const oldY = proj.y;
+
+        // Smoothly follow the target location
+        proj.x += (targetX - proj.x) * 0.11;
+        proj.y += (targetY - proj.y) * 0.11;
+
+        const dx = proj.x - oldX;
+        const dy = proj.y - oldY;
+        if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+          proj.rotation = Math.atan2(dy, dx);
+        }
+
+        proj.duration = 999999;
       } else if (proj.type === 'axe') {
         // Axe gravity arcs
         proj.x += proj.vx;
@@ -1361,6 +2011,14 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
             // Weapon hit! Damage enemy
             enemy.hp -= proj.damage;
             proj.pierce--;
+
+            // Note bounce pierce preservation
+            if (proj.type === 'note' && proj.bounce && proj.bounce > 0) {
+              proj.pierce = 1;
+            }
+            if (proj.type === 'summon') {
+              proj.pierce = 99999;
+            }
 
             // Life steal for Level 5 Whip
             if (proj.type === 'whip') {
@@ -1425,6 +2083,113 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
               }
             }
 
+            // Hadouken Level 9 blast explosion
+            if (proj.type === 'hadouken') {
+              const hadoukenLvl = state.weapons.find((w) => w.type === 'hadouken')?.level || 0;
+              if (hadoukenLvl >= 9) {
+                sfx.playLightningStrike();
+                const splashArea = 90;
+                for (let e = 0; e < 10; e++) {
+                  const pAngle = Math.random() * Math.PI * 2;
+                  const pSpeed = 1.5 + Math.random() * 3.5;
+                  state.particles.push({
+                    x: proj.x,
+                    y: proj.y,
+                    vx: Math.cos(pAngle) * pSpeed,
+                    vy: Math.sin(pAngle) * pSpeed,
+                    size: 2 + Math.random() * 3,
+                    color: '#38bdf8', // sky blue sparks
+                    opacity: 1,
+                    duration: 20,
+                  });
+                }
+                state.enemies.forEach((otherEnemy: Enemy) => {
+                  const splDist = Math.sqrt((otherEnemy.x - proj.x) ** 2 + (otherEnemy.y - proj.y) ** 2);
+                  if (splDist < splashArea) {
+                    const splDmg = proj.damage * 0.45;
+                    otherEnemy.hp -= splDmg;
+                    state.floatingTexts.push({
+                      id: Math.random().toString(),
+                      text: `${Math.round(splDmg)}`,
+                      x: otherEnemy.x,
+                      y: otherEnemy.y - 10,
+                      color: '#38bdf8',
+                      duration: 25,
+                      size: 11,
+                    });
+                  }
+                });
+              }
+            }
+
+            // Note bouncing and Level 5 symphonic chorus shockwave
+            if (proj.type === 'note') {
+              if (proj.bounce && proj.bounce > 0) {
+                proj.bounce--;
+                const otherEnemies = state.enemies.filter((e: Enemy) => e.id !== enemy.id);
+                let targetEnemy: Enemy | null = null;
+                let minDist = 250;
+                
+                otherEnemies.forEach((e: Enemy) => {
+                  const dist = Math.sqrt((e.x - proj.x) ** 2 + (e.y - proj.y) ** 2);
+                  if (dist < minDist) {
+                    minDist = dist;
+                    targetEnemy = e;
+                  }
+                });
+                
+                if (targetEnemy) {
+                  const bAngle = Math.atan2((targetEnemy as Enemy).y - proj.y, (targetEnemy as Enemy).x - proj.x);
+                  const bSpeed = 5.5;
+                  proj.vx = Math.cos(bAngle) * bSpeed;
+                  proj.vy = Math.sin(bAngle) * bSpeed;
+                  proj.rotation = bAngle;
+                } else {
+                  const bAngle = Math.random() * Math.PI * 2;
+                  const bSpeed = 4.5;
+                  proj.vx = Math.cos(bAngle) * bSpeed;
+                  proj.vy = Math.sin(bAngle) * bSpeed;
+                  proj.rotation = bAngle;
+                }
+                
+                sfx.playNote();
+                
+                const noteLvl = state.weapons.find((w) => w.type === 'note')?.level || 0;
+                if (noteLvl >= 5) {
+                  for (let r = 0; r < 8; r++) {
+                    const rAngle = (r / 8) * Math.PI * 2;
+                    state.particles.push({
+                      x: proj.x,
+                      y: proj.y,
+                      vx: Math.cos(rAngle) * 2,
+                      vy: Math.sin(rAngle) * 2,
+                      size: 2,
+                      color: '#ec4899', // pink shockwave
+                      opacity: 0.8,
+                      duration: 15,
+                    });
+                  }
+                  
+                  otherEnemies.forEach((otherEnemy: Enemy) => {
+                    const dist = Math.sqrt((otherEnemy.x - proj.x) ** 2 + (otherEnemy.y - proj.y) ** 2);
+                    if (dist < 60) {
+                      const waveDmg = proj.damage * 0.4;
+                      otherEnemy.hp -= waveDmg;
+                      state.floatingTexts.push({
+                        id: Math.random().toString(),
+                        text: `${Math.round(waveDmg)}`,
+                        x: otherEnemy.x,
+                        y: otherEnemy.y - 10,
+                        color: '#f472b6',
+                        duration: 25,
+                        size: 10,
+                      });
+                    }
+                  });
+                }
+              }
+            }
+
             // Create blood/impact particles
             const particleColor = enemy.color;
             for (let p = 0; p < 3; p++) {
@@ -1444,16 +2209,23 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
             const angle = Math.atan2(enemy.y - proj.y, enemy.x - proj.x);
             let force = (proj.type === 'axe') ? 5 : 2;
             if (proj.type === 'whip') force = 3.5;
+            if (proj.type === 'hadouken') force = 6;
+            if (proj.type === 'note') force = 2;
+            if (proj.type === 'summon') {
+              const summonLvl = state.weapons.find((w: any) => w.type === 'summon')?.level || 1;
+              force = summonLvl >= 4 ? 6.5 : 4.0;
+            }
             enemy.knockbackX += Math.cos(angle) * force;
             enemy.knockbackY += Math.sin(angle) * force;
 
             // Damage Text Popup
+            const textPopupColor = proj.type === 'summon' ? '#22c55e' : '#ffffff';
             state.floatingTexts.push({
               id: Math.random().toString(),
               text: `${Math.round(proj.damage)}`,
               x: enemy.x + (Math.random() - 0.5) * 15,
               y: enemy.y - 12,
-              color: '#ffffff',
+              color: textPopupColor,
               duration: 30,
               size: 12,
             });
@@ -1514,6 +2286,11 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
 
     // 4. ENEMIES UPDATES, PHYSICS & DAMAGE TO PLAYER
     state.enemies.forEach((enemy: Enemy) => {
+      if (enemy.type === 'white_reaper') {
+        enemy.knockbackX = 0;
+        enemy.knockbackY = 0;
+      }
+
       // Apply Decaying Knockbacks
       enemy.x += enemy.knockbackX;
       enemy.y += enemy.knockbackY;
@@ -1526,6 +2303,28 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       
       let moveSpeed = enemy.speed;
       let shouldMove = true;
+
+      // --- WHITE REAPER AI MOVEMENT ---
+      if (enemy.type === 'white_reaper') {
+        // Direct, relentless movement towards player
+        enemy.x += Math.cos(angle) * enemy.speed;
+        enemy.y += Math.sin(angle) * enemy.speed;
+        shouldMove = false;
+
+        // Spawn black shadowy trail particles
+        if (state.waveTimer % 3 === 0) {
+          state.particles.push({
+            x: enemy.x + (Math.random() - 0.5) * 15,
+            y: enemy.y + (Math.random() - 0.5) * 15,
+            vx: -Math.cos(angle) * 1.5,
+            vy: -Math.sin(angle) * 1.5,
+            size: 4 + Math.random() * 6,
+            color: '#111827', // dark slate black
+            opacity: 0.8,
+            duration: 35,
+          });
+        }
+      }
 
       // --- SKELETON AI: THROWS BONES REMOVED ---
 
@@ -2000,6 +2799,55 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         }
       }
 
+      // --- DARK LORD BOSS AI: ULTIMATE APOCALYPSE ---
+      if (enemy.type === 'dark_lord_boss') {
+        if (enemy.shootCooldown === undefined) enemy.shootCooldown = 60;
+        enemy.shootCooldown--;
+        if (enemy.shootCooldown <= 0) {
+          enemy.shootCooldown = 110; // Around 1.8 seconds
+          sfx.playLightningStrike();
+
+          // Fire majestic spiral of 18 purple dark fireballs
+          const fCount = 18;
+          for (let i = 0; i < fCount; i++) {
+            const frAngle = (i / fCount) * Math.PI * 2 + (state.waveTimer * 0.03);
+            const frSpeed = 3.2;
+            state.enemyProjectiles.push({
+              id: Math.random().toString(),
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(frAngle) * frSpeed,
+              vy: Math.sin(frAngle) * frSpeed,
+              size: 16,
+              damage: enemy.damage * 0.7,
+              color: '#a855f7', // Deep purple
+              rotation: Math.random() * Math.PI,
+              duration: 220,
+              emoji: '🔥',
+            });
+          }
+
+          // Triple targeted void orbs towards player
+          for (let i = -1; i <= 1; i++) {
+            const aimedAngle = angle + i * 0.22;
+            const aimedSpeed = 4.0;
+            state.enemyProjectiles.push({
+              id: Math.random().toString(),
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(aimedAngle) * aimedSpeed,
+              vy: Math.sin(aimedAngle) * aimedSpeed,
+              size: 20,
+              damage: enemy.damage * 1.1,
+              color: '#4c1d95', // Rich Indigo
+              rotation: 0,
+              duration: 250,
+              emoji: '🔮',
+            });
+          }
+        }
+      }
+
       if (shouldMove) {
         enemy.x += Math.cos(angle) * moveSpeed;
         enemy.y += Math.sin(angle) * moveSpeed;
@@ -2018,10 +2866,10 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
 
       // 3. Separation push (prevent clumped enemies)
       // Skip ghosts so ghosts float freely over arrays of zombies
-      if (enemy.type !== 'ghost') {
+      if (enemy.type !== 'ghost' && enemy.type !== 'white_reaper') {
         for (let j = 0; j < state.enemies.length; j++) {
           const other = state.enemies[j];
-          if (other.id === enemy.id || other.type === 'ghost') continue;
+          if (other.id === enemy.id || other.type === 'ghost' || other.type === 'white_reaper') continue;
           const dxSep = enemy.x - other.x;
           const dySep = enemy.y - other.y;
           const distSepSq = dxSep * dxSep + dySep * dySep;
@@ -2039,7 +2887,21 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
 
       // Enemy contact vs Player Damage Check
       if (pDist < enemy.size + state.player.radius) {
-        if (state.player.invulnTimer <= 0) {
+        if (enemy.type === 'white_reaper') {
+          if (state.whiteReaperTouchTimer === null) {
+            state.whiteReaperTouchTimer = 60; // 1 second
+            sfx.playGameOver(); // play ominous countdown melody
+            state.floatingTexts.push({
+              id: Math.random().toString(),
+              text: '☠️ 死の宣告 (TOUCHED BY DEATH) ☠️',
+              x: state.player.x,
+              y: state.player.y - 100,
+              color: '#ffffff',
+              duration: 120,
+              size: 20,
+            });
+          }
+        } else if (state.player.invulnTimer <= 0) {
           // Calculate flat armor reduction
           const finalDamage = Math.max(1, enemy.damage - state.player.stats.armor);
           state.player.stats.hp -= finalDamage;
@@ -2085,6 +2947,9 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
     // Handle defeated enemies, reward XP, Drop Gems
     const activeEnemies: Enemy[] = [];
     state.enemies.forEach((enemy: Enemy) => {
+      if (enemy.type === 'white_reaper') {
+        enemy.hp = enemy.maxHp; // Force absolute immortality
+      }
       if (enemy.hp <= 0) {
         // ENEMY DEFEATED!
         state.stats.kills += 1;
@@ -2121,38 +2986,81 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         }
 
         if (enemy.isBoss) {
-          // Drop Chest containing Chicken heal asset or massive red chest item
-          state.gems.push({
-            id: Math.random().toString(),
-            x: enemy.x,
-            y: enemy.y,
-            value: 0,
-            color: '#ef4444', // beautiful gold chest chicken
-            isGold: false,
-            isChicken: true,
-          });
-          // Also drop magnet with 50% chance
-          if (Math.random() < 0.5) {
-            state.gems.push({
+          if (enemy.type === 'dark_lord_boss') {
+            // Ultimate victory trigger!
+            state.darkLordDefeated = true;
+            state.whiteReaperCountdown = 300; // 5 seconds at 60 FPS
+            
+            // Dramatic victory text
+            state.floatingTexts.push({
               id: Math.random().toString(),
-              x: enemy.x + 20,
-              y: enemy.y + 20,
-              value: 0,
-              color: '#a855f7',
-              isGold: false,
-              isMagnet: true,
-            });
-          } else {
-            // Drop Holy bomb with 50% chance
-            state.gems.push({
-              id: Math.random().toString(),
-              x: enemy.x - 20,
-              y: enemy.y - 20,
-              value: 0,
+              text: '🏆 VICTORY! 魔王カオスロードを討伐した！',
+              x: state.player.x,
+              y: state.player.y - 120,
               color: '#fbbf24',
-              isGold: false,
-              isBomb: true,
+              duration: 250,
+              size: 24,
             });
+
+            state.floatingTexts.push({
+              id: Math.random().toString(),
+              text: '⌛ 5秒後に何かがやってくる...',
+              x: state.player.x,
+              y: state.player.y - 80,
+              color: '#f87171',
+              duration: 250,
+              size: 16,
+            });
+
+            sfx.playLevelUp(); // Play level up sound as triumphant fanfare
+            
+            // Spawn tons of gold coins around the corpse as an ultimate reward
+            for (let i = 0; i < 40; i++) {
+              const theta = Math.random() * Math.PI * 2;
+              const dist = 10 + Math.random() * 80;
+              state.gems.push({
+                id: Math.random().toString(),
+                x: enemy.x + Math.cos(theta) * dist,
+                y: enemy.y + Math.sin(theta) * dist,
+                value: 50,
+                color: '#eab308',
+                isGold: true,
+              });
+            }
+          } else {
+            // Drop Chest containing Chicken heal asset or massive red chest item
+            state.gems.push({
+              id: Math.random().toString(),
+              x: enemy.x,
+              y: enemy.y,
+              value: 0,
+              color: '#ef4444', // beautiful gold chest chicken
+              isGold: false,
+              isChicken: true,
+            });
+            // Also drop magnet with 50% chance
+            if (Math.random() < 0.5) {
+              state.gems.push({
+                id: Math.random().toString(),
+                x: enemy.x + 20,
+                y: enemy.y + 20,
+                value: 0,
+                color: '#a855f7',
+                isGold: false,
+                isMagnet: true,
+              });
+            } else {
+              // Drop Holy bomb with 50% chance
+              state.gems.push({
+                id: Math.random().toString(),
+                x: enemy.x - 20,
+                y: enemy.y - 20,
+                value: 0,
+                color: '#fbbf24',
+                isGold: false,
+                isBomb: true,
+              });
+            }
           }
         } else if (rand < 0.05) {
           // Drop Roast Chicken (HP Recovery)
@@ -2421,6 +3329,8 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         // We scale the size slightly based on enemy radius to look proportional and majestic
         let sizeMultiplier = 3.8;
         if (enemy.type === 'werewolf') sizeMultiplier = 4.8;
+        else if (enemy.type === 'dark_lord_boss') sizeMultiplier = 5.2; // Majestic giant size
+        else if (enemy.type === 'white_reaper') sizeMultiplier = 4.8; // Great reaper size
         else if (enemy.isBoss) sizeMultiplier = 4.4;
         
         const drawW = enemy.size * sizeMultiplier;
@@ -2451,12 +3361,14 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         if (enemy.type === 'archmage_boss') monsterEmoji = '🔮';
         if (enemy.type === 'dragon_boss') monsterEmoji = '🐉';
         if (enemy.type === 'phoenix_boss') monsterEmoji = '🔥';
+        if (enemy.type === 'dark_lord_boss') monsterEmoji = '👑';
+        if (enemy.type === 'white_reaper') monsterEmoji = '☠️';
 
         ctx.fillText(monsterEmoji, rx, ry + wiggle);
       }
 
       // Enemy HP Bar in Bosses
-      if (enemy.isBoss && enemy.hp > 0) {
+      if (enemy.isBoss && enemy.hp > 0 && enemy.type !== 'white_reaper') {
         const barW = enemy.size * 2;
         const barH = 4;
         ctx.fillStyle = '#1c1917';
@@ -2480,37 +3392,80 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       ctx.rotate(proj.rotation);
 
       if (proj.type === 'whip') {
-        // Draw whipping electric/energy slashing crescent arc
-        ctx.strokeStyle = proj.color;
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.arc(0, 0, proj.size / 3, -Math.PI / 4, Math.PI / 4);
-        ctx.stroke();
+        const img = state.weaponImages['whip'];
+        const isReadyImage = img && (
+          (img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) ||
+          (img instanceof HTMLCanvasElement && img.width > 0)
+        );
+        if (isReadyImage && img) {
+          ctx.save();
+          const drawW = proj.size;
+          const drawH = proj.size * 0.35;
+          ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+          ctx.restore();
+        } else {
+          // Draw whipping electric/energy slashing crescent arc
+          ctx.strokeStyle = proj.color;
+          ctx.lineWidth = 4;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.arc(0, 0, proj.size / 3, -Math.PI / 4, Math.PI / 4);
+          ctx.stroke();
 
-        ctx.strokeStyle = '#38bdf8'; // light sky blue details
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(0, 0, proj.size / 3 + 3, -Math.PI / 4, Math.PI / 4);
-        ctx.stroke();
+          ctx.strokeStyle = '#38bdf8'; // light sky blue details
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, proj.size / 3 + 3, -Math.PI / 4, Math.PI / 4);
+          ctx.stroke();
+        }
       } else if (proj.type === 'fireball') {
-        // Spinning fire drop
-        ctx.font = '22px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🔥', 0, 0);
+        const img = state.weaponImages['fireball'];
+        const isReadyImage = img && (
+          (img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) ||
+          (img instanceof HTMLCanvasElement && img.width > 0)
+        );
+        if (isReadyImage && img) {
+          const drawSize = proj.size * 1.8;
+          ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+        } else {
+          // Spinning fire drop
+          ctx.font = '22px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🔥', 0, 0);
+        }
       } else if (proj.type === 'axe') {
-        // Spinning iron axe icon
-        ctx.font = `${proj.size * 1.6}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🪓', 0, 0);
+        const img = state.weaponImages['axe'];
+        const isReadyImage = img && (
+          (img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) ||
+          (img instanceof HTMLCanvasElement && img.width > 0)
+        );
+        if (isReadyImage && img) {
+          const drawSize = proj.size * 1.8;
+          ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+        } else {
+          // Spinning iron axe icon
+          ctx.font = `${proj.size * 1.6}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🪓', 0, 0);
+        }
       } else if (proj.type === 'bible') {
-        // Spinning glowing azure spell book
-        ctx.font = `${proj.size * 1.6}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('📖', 0, 0);
+        const img = state.weaponImages['bible'];
+        const isReadyImage = img && (
+          (img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) ||
+          (img instanceof HTMLCanvasElement && img.width > 0)
+        );
+        if (isReadyImage && img) {
+          const drawSize = proj.size * 1.6;
+          ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+        } else {
+          // Spinning glowing azure spell book
+          ctx.font = `${proj.size * 1.6}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('📖', 0, 0);
+        }
       } else if (proj.type === 'lightning') {
         // Circular expanding lightning ring splash visual
         ctx.strokeStyle = '#fbbf24';
@@ -2519,6 +3474,69 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         const animScale = (6 - proj.duration) / 6; // scale out
         ctx.arc(0, 0, proj.size * animScale, 0, Math.PI * 2);
         ctx.stroke();
+      } else if (proj.type === 'hadouken') {
+        const img = state.weaponImages['hadouken'];
+        const isReadyImage = img && (
+          (img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) ||
+          (img instanceof HTMLCanvasElement && img.width > 0)
+        );
+        if (isReadyImage && img) {
+          const drawSize = proj.size * 1.8;
+          ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+        } else {
+          ctx.font = `${proj.size * 1.6}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🌀', 0, 0);
+        }
+      } else if (proj.type === 'note') {
+        const img = state.weaponImages['note'];
+        const isReadyImage = img && (
+          (img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) ||
+          (img instanceof HTMLCanvasElement && img.width > 0)
+        );
+        if (isReadyImage && img) {
+          const drawSize = proj.size * 1.8;
+          ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+        } else {
+          ctx.font = `${proj.size * 1.6}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🎵', 0, 0);
+        }
+      } else if (proj.type === 'summon') {
+        // Glowing magic aura
+        const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, proj.size * 1.6);
+        grad.addColorStop(0, 'rgba(34, 197, 94, 0.45)');
+        grad.addColorStop(0.5, 'rgba(139, 92, 246, 0.2)');
+        grad.addColorStop(1, 'rgba(139, 92, 246, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, proj.size * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw custom pixel art dragon_boss if loaded
+        const img = state.enemyImages['dragon_boss'];
+        const isReadyImage = img && (
+          (img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) ||
+          (img instanceof HTMLCanvasElement && img.width > 0)
+        );
+
+        if (isReadyImage && img) {
+          ctx.save();
+          // The pixel art naturally faces left, scale horizontally so 0 degrees points right
+          ctx.scale(-1, 1);
+          const drawW = proj.size * 2.5;
+          const drawH = proj.size * 2.5;
+          ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+          ctx.restore();
+        } else {
+          // Fallback with cute green dragon emoji
+          ctx.font = `${proj.size * 1.6}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🐉', 0, 0);
+        }
       }
 
       ctx.restore();
@@ -2594,6 +3612,45 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
     }
 
     ctx.restore();
+
+    // 4.5 DRAW GARLIC AURA Around Player
+    const garlicWeaponState = state.weapons.find((w: any) => w.type === 'garlic');
+    if (garlicWeaponState) {
+      const radius = (65 + garlicWeaponState.level * 15) * state.player.stats.area;
+      const img = state.weaponImages['garlic'];
+      const isReadyImage = img && (
+        (img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) ||
+        (img instanceof HTMLCanvasElement && img.width > 0)
+      );
+
+      ctx.save();
+      ctx.translate(px, py);
+      // Slow rotation for vortex effect
+      const rotationAngle = (state.waveTimer * 0.015) % (Math.PI * 2);
+      ctx.rotate(rotationAngle);
+      ctx.globalAlpha = 0.35 + Math.sin(state.waveTimer * 0.05) * 0.05; // pulsing effect
+
+      if (isReadyImage && img) {
+        ctx.drawImage(img, -radius, -radius, radius * 2, radius * 2);
+      } else {
+        // Fallback: draw a beautiful glowing purple ring
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+        ctx.lineWidth = 4 + Math.sin(state.waveTimer * 0.05) * 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // draw small glowing purple center aura
+        const grad = ctx.createRadialGradient(0, 0, 10, 0, 0, radius);
+        grad.addColorStop(0, 'rgba(168, 85, 247, 0.15)');
+        grad.addColorStop(1, 'rgba(168, 85, 247, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
 
     // 5. DRAW SYSTEM PARTICLES
     state.particles.forEach((p: Particle) => {
@@ -2876,7 +3933,7 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
 
       let bossType: 'medusa_boss' | 'golem_boss' | 'archmage_boss' | 'dragon_boss' | 'phoenix_boss' | 'vampire_boss' = 'medusa_boss';
       let bossName = '【深淵の妖女】メデューサ';
-      let bossHp = 400;
+      let bossHp = 1500; // Increased from 400
       let bossSpeed = 1.1;
       let bossDamage = 18;
       let bossSize = 28;
@@ -2885,7 +3942,7 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       if (minuteIndex === 2) {
         bossType = 'golem_boss';
         bossName = '【古代の巨神】ゴーレム';
-        bossHp = 800;
+        bossHp = 3000; // Increased from 800
         bossSpeed = 0.8;
         bossDamage = 28;
         bossSize = 34;
@@ -2893,7 +3950,7 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       } else if (minuteIndex === 3) {
         bossType = 'archmage_boss';
         bossName = '【魔界の覇王】アークメイジ';
-        bossHp = 650;
+        bossHp = 2500; // Increased from 650
         bossSpeed = 1.2;
         bossDamage = 24;
         bossSize = 28;
@@ -2901,7 +3958,7 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       } else if (minuteIndex === 4) {
         bossType = 'dragon_boss';
         bossName = '【煉獄の滅竜】レッドドラゴン';
-        bossHp = 1250;
+        bossHp = 4500; // Increased from 1250
         bossSpeed = 1.4;
         bossDamage = 34;
         bossSize = 36;
@@ -2909,7 +3966,7 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
       } else if (minuteIndex >= 5) {
         bossType = 'phoenix_boss';
         bossName = '【不死の極炎】フェニックス';
-        bossHp = 1000;
+        bossHp = 4000; // Increased from 1000
         bossSpeed = 1.8;
         bossDamage = 30;
         bossSize = 32;
@@ -2921,8 +3978,8 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         type: bossType,
         x: spawnX,
         y: spawnY,
-        hp: bossHp + elapsedSeconds * 2,
-        maxHp: bossHp + elapsedSeconds * 2,
+        hp: bossHp + elapsedSeconds * 10, // Increased scaling multiplier from 2 to 10
+        maxHp: bossHp + elapsedSeconds * 10,
         speed: bossSpeed,
         damage: bossDamage + elapsedSeconds * 0.1,
         size: bossSize,
@@ -2960,8 +4017,8 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         type: 'reaper',
         x: spawnX,
         y: spawnY,
-        hp: 99999, // Near-impossible health!
-        maxHp: 99999,
+        hp: 999999, // Near-impossible health! (Increased from 99999)
+        maxHp: 999999,
         speed: 1.6,
         damage: 150, // Massive blow
         size: 32,
@@ -2984,6 +4041,64 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         duration: 150,
         size: 16,
       });
+    }
+
+    // Spawn Ultimate Final Boss: Dark Lord 「【混沌の支配者】カオスロード」 at 10 minutes (600s)!
+    if (elapsedSeconds >= 600 && !state.darkLordSpawned) {
+      state.darkLordSpawned = true;
+      
+      // Dramatic event: wipe out all minor enemies to prepare for the ultimate duel!
+      state.enemies = state.enemies.filter((e: any) => e.isBoss && e.type !== 'reaper');
+
+      const angle = Math.random() * Math.PI * 2;
+      const spawnX = state.player.x + Math.cos(angle) * 320;
+      const spawnY = state.player.y + Math.sin(angle) * 320;
+
+      state.enemies.push({
+        id: Math.random().toString(),
+        type: 'dark_lord_boss',
+        x: spawnX,
+        y: spawnY,
+        hp: 400000, // Balanced majestic final boss HP
+        maxHp: 400000,
+        speed: 1.0, // Slow but immense presence
+        damage: 85, // Heavy hitting
+        size: 45, // Extremely large
+        color: '#c084fc', // purple majestic aura
+        isBoss: true,
+        scoreValue: 50000,
+        expValue: 500,
+        goldChance: 1.0,
+        animationFrame: 0,
+        knockbackX: 0,
+        knockbackY: 0,
+      });
+
+      state.floatingTexts.push({
+        id: Math.random().toString(),
+        text: '👑 警告: 【混沌の支配者】カオスロード 降臨！ 👑',
+        x: state.player.x,
+        y: state.player.y - 80,
+        color: '#c084fc',
+        duration: 200,
+        size: 18,
+      });
+
+      // Big warp burst
+      for (let i = 0; i < 30; i++) {
+        const pAngle = Math.random() * Math.PI * 2;
+        const pSpeed = 2 + Math.random() * 8;
+        state.particles.push({
+          x: state.player.x,
+          y: state.player.y,
+          vx: Math.cos(pAngle) * pSpeed,
+          vy: Math.sin(pAngle) * pSpeed,
+          size: 4 + Math.random() * 5,
+          color: '#c084fc',
+          opacity: 0.9,
+          duration: 40,
+        });
+      }
     }
   };
 
@@ -3038,13 +4153,16 @@ export function GameCanvas({ playerClass, onGameOver, onBackToTitle }: GameCanva
         <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 justify-start md:justify-center mx-2 max-w-full">
           {weaponsList.map((wl, idx) => (
             <div key={`w-${idx}`} className="flex items-center bg-zinc-900/90 border border-zinc-800/80 px-2.5 py-1 rounded-xl shrink-0 text-xs">
-              <span className="text-sm mr-1.5" title={wl.type}>
-                {wl.type === 'whip' && '🪢'}
-                {wl.type === 'fireball' && '🔥'}
-                {wl.type === 'garlic' && '🧄'}
-                {wl.type === 'axe' && '🪓'}
-                {wl.type === 'bible' && '📖'}
-                {wl.type === 'lightning' && '⚡'}
+              <span className="flex items-center justify-center w-5 h-5 mr-1.5" title={wl.type}>
+                {wl.type === 'whip' && <img src={whipImage} className="w-5 h-5 object-contain rounded" referrerPolicy="no-referrer" alt="Whip" />}
+                {wl.type === 'fireball' && <img src={fireballImage} className="w-5 h-5 object-contain rounded" referrerPolicy="no-referrer" alt="Fireball" />}
+                {wl.type === 'garlic' && <img src={garlicImage} className="w-5 h-5 object-contain rounded" referrerPolicy="no-referrer" alt="Garlic" />}
+                {wl.type === 'axe' && <img src={axeImage} className="w-5 h-5 object-contain rounded" referrerPolicy="no-referrer" alt="Axe" />}
+                {wl.type === 'bible' && <img src={bibleImage} className="w-5 h-5 object-contain rounded" referrerPolicy="no-referrer" alt="Bible" />}
+                {wl.type === 'lightning' && <span className="text-sm">⚡</span>}
+                {wl.type === 'hadouken' && <img src={hadoukenImage} className="w-5 h-5 object-contain rounded" referrerPolicy="no-referrer" alt="Hadouken" />}
+                {wl.type === 'note' && <img src={noteImage} className="w-5 h-5 object-contain rounded" referrerPolicy="no-referrer" alt="Note" />}
+                {wl.type === 'summon' && <span className="text-sm">🐉</span>}
               </span>
               <span className="font-bold text-zinc-300 text-[10px]">L.{wl.level}</span>
             </div>

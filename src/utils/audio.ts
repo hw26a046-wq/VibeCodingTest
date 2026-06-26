@@ -152,6 +152,19 @@ class SoundManager {
     this.playTone([1200, 100], 0.2, 'sawtooth', [0.12, 0.001], true);
   }
 
+  public playHadouken() {
+    // Ki blast sound effect: deep charging to swoosh
+    this.playNoise(0.18, 1500, 0.08);
+    this.playTone([220, 440, 300], 0.2, 'triangle', [0.14, 0.001], true);
+  }
+
+  public playNote() {
+    // Sweet chiming musical notes
+    const frequencies = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50];
+    const freq = frequencies[Math.floor(Math.random() * frequencies.length)];
+    this.playTone([freq, freq * 1.5], 0.12, 'sine', [0.08, 0.001], true);
+  }
+
   public playHurt() {
     this.playTone([180, 80], 0.15, 'sawtooth', [0.12, 0.001], true);
   }

@@ -226,21 +226,25 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-xl mx-auto bg-zinc-950/90 border-2 border-red-500/20 rounded-3xl p-6 md:p-8 text-center relative overflow-hidden shadow-2xl"
+              className={`max-w-xl mx-auto bg-zinc-950/90 border-2 ${lastStats.isVictory ? 'border-amber-500/40' : 'border-red-500/20'} rounded-3xl p-6 md:p-8 text-center relative overflow-hidden shadow-2xl`}
             >
-              <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-10 bg-radial from-red-500 to-transparent blur-xl" />
+              <div className={`absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-10 bg-radial ${lastStats.isVictory ? 'from-amber-500' : 'from-red-500'} to-transparent blur-xl`} />
 
-              {/* Death icon */}
-              <div className="w-20 h-20 bg-red-500/10 border border-red-500/20 text-red-500 rounded-full mx-auto flex items-center justify-center mb-6 text-3xl">
-                💀
+              {/* Victory or Death icon */}
+              <div className={`w-20 h-20 ${lastStats.isVictory ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400' : 'bg-red-500/10 border border-red-500/20 text-red-500'} rounded-full mx-auto flex items-center justify-center mb-6 text-3xl`}>
+                {lastStats.isVictory ? '🏆' : '💀'}
               </div>
 
-              <span className="text-xs font-mono tracking-[0.4em] text-red-500 font-bold block mb-1">RUN SUMMARY</span>
+              <span className={`text-xs font-mono tracking-[0.4em] ${lastStats.isVictory ? 'text-amber-400' : 'text-red-500'} font-bold block mb-1`}>
+                {lastStats.isVictory ? 'VICTORY SUMMARY' : 'RUN SUMMARY'}
+              </span>
               <h1 className="text-3xl md:text-4xl font-black text-zinc-100 tracking-tight mb-2">
-                討ち死に (RUN OVER)
+                {lastStats.isVictory ? '大勝利 (GAME CLEAR)' : '討ち死に (RUN OVER)'}
               </h1>
-              <p className="text-zinc-400 text-xs md:text-sm leading-relaxed max-w-xs mx-auto mb-8 font-sans">
-                聖騎士アリスターたちの加護もここまでです。モンスターの群れはあなたの魂を飲み込みました。
+              <p className="text-zinc-400 text-xs md:text-sm leading-relaxed max-w-sm mx-auto mb-8 font-sans">
+                {lastStats.isVictory 
+                  ? '魔王カオスロードを完全に撃破しました！あなたはアビスの深淵に希望の光をもたらした真の英雄です！' 
+                  : '聖騎士アリスターたちの加護もここまでです。モンスターの群れはあなたの魂を飲み込みました。'}
               </p>
 
               {/* New Personal Best Flag */}
@@ -302,7 +306,7 @@ export default function App() {
                   }}
                   className="flex-1 bg-zinc-100 hover:bg-white text-zinc-950 font-black text-xs uppercase tracking-widest py-3.5 rounded-2xl cursor-pointer transition-colors shadow"
                 >
-                  同じクラスでリベンジする
+                  {lastStats.isVictory ? '他のクラスで挑戦する' : '同じクラスでリベンジする'}
                 </motion.button>
 
                 <motion.button

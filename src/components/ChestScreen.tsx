@@ -9,6 +9,14 @@ import { ActiveUpgrade, WeaponType, PassiveType } from '../types';
 import { Swords, Shield, Zap, Eye, Heart, Clock, CircleDot, Gift, Award, Sparkles } from 'lucide-react';
 import { sfx } from '../utils/audio';
 
+import whipImage from '../assets/images/whip_pixel_1782472362145.jpg';
+import fireballImage from '../assets/images/fireball_pixel_1782472376447.jpg';
+import garlicImage from '../assets/images/garlic_pixel_1782472386492.jpg';
+import axeImage from '../assets/images/axe_pixel_1782472402626.jpg';
+import bibleImage from '../assets/images/bible_pixel_1782472426654.jpg';
+import hadoukenImage from '../assets/images/hadouken_pixel_1782472416063.jpg';
+import noteImage from '../assets/images/note_pixel_1782472440238.jpg';
+
 interface ChestScreenProps {
   upgrades: ActiveUpgrade[];
   count: number;
@@ -24,13 +32,15 @@ export function ChestScreen({ upgrades, count, onClose }: ChestScreenProps) {
   const getIcon = (type: 'weapon' | 'passive', targetType: WeaponType | PassiveType) => {
     if (type === 'weapon') {
       switch (targetType) {
-        case 'whip': return '🪢';
-        case 'fireball': return '🔥';
-        case 'garlic': return '🧄';
-        case 'axe': return '🪓';
-        case 'bible': return '📖';
-        case 'lightning': return '⚡';
-        default: return '⚔️';
+        case 'whip': return <img src={whipImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-800 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Whip" />;
+        case 'fireball': return <img src={fireballImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-800 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Fireball" />;
+        case 'garlic': return <img src={garlicImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-800 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Garlic" />;
+        case 'axe': return <img src={axeImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-800 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Axe" />;
+        case 'bible': return <img src={bibleImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-800 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Bible" />;
+        case 'lightning': return <span className="text-2xl">⚡</span>;
+        case 'hadouken': return <img src={hadoukenImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-800 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Hadouken" />;
+        case 'note': return <img src={noteImage} className="w-10 h-10 object-contain rounded-lg border border-zinc-800 bg-zinc-900/50 p-0.5" referrerPolicy="no-referrer" alt="Note" />;
+        default: return <span className="text-2xl">⚔️</span>;
       }
     } else {
       switch (targetType) {
